@@ -1,6 +1,6 @@
 {
   "name": "tony-agents-pack",
   "description": "ZCode 专用的 17 个流水线子智能体：工程×5、内容×2、外贸获客×4、核查×6。内置注入防御、状态化交付和固定判定标准；可按本地模型资源适配（见 INSTALL-FOR-AI.md）。",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "agents": "agents"
 }

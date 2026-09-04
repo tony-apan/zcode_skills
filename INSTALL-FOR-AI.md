@@ -1,6 +1,6 @@
 # ZCode 专用 AI 自适配 Bootstrap 安装协议
 
-本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v1.0.4`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
+本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v1.0.5`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
 
 > 三种模式互斥：插件模式、AI 自适配模式、脚本手工模式只能选一种。本协议只执行 **AI 自适配**；禁止同时安装插件，禁止直接复制或覆盖 `agents/*.md`。
 
@@ -16,7 +16,7 @@
 
 ## 阶段 0：环境与 state 预检
 
-写入前识别当前 OS，并确认 Git、Python >= 3.9 可执行；Windows 另确认 PowerShell >= 5.1。请求 tag 必须是固定的 `v1.0.4`，不是分支或其他版本。无法验证的前提应停止并报告。
+写入前识别当前 OS，并确认 Git、Python >= 3.9 可执行；Windows 另确认 PowerShell >= 5.1。请求 tag 必须是固定的 `v1.0.5`，不是分支或其他版本。无法验证的前提应停止并报告。
 
 macOS / Linux：
 
@@ -42,7 +42,7 @@ $State = Join-Path $env:USERPROFILE '.zcode\agents\.tony-agents-pack\state.json'
 - 不存在 state：进入首次安装流程。
 - 存在 state：只读取其中无 secrets 的 `package` 与 `version`。
 - `package` 不是 `tony-agents-pack`：停止并报告，不接管该 state。
-- `version` 已是 `1.0.4` 且用户未明确要求重装：停止写入并报告已安装。
+- `version` 已是 `1.0.5` 且用户未明确要求重装：停止写入并报告已安装。
 - 版本不同：进入更新流程。
 - 只有用户明确说“重装”或“覆盖”时才可进入强制重装流程并使用 `install --force`；不得由 AI 自行决定强制覆盖。
 
@@ -53,8 +53,8 @@ $State = Join-Path $env:USERPROFILE '.zcode\agents\.tony-agents-pack\state.json'
 macOS / Linux：
 
 ```sh
-WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v1.0.4.XXXXXX")
-git clone --branch v1.0.4 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
+WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v1.0.5.XXXXXX")
+git clone --branch v1.0.5 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
 git -C "$WORKTREE" describe --tags --exact-match HEAD
 git -C "$WORKTREE" status --short
 ```
@@ -62,13 +62,13 @@ git -C "$WORKTREE" status --short
 Windows PowerShell 5.1+：
 
 ```powershell
-$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v1.0.4-" + [guid]::NewGuid().ToString("N"))
-git clone --branch v1.0.4 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
+$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v1.0.5-" + [guid]::NewGuid().ToString("N"))
+git clone --branch v1.0.5 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
 git -C $Worktree describe --tags --exact-match HEAD
 git -C $Worktree status --short
 ```
 
-核验输出必须精确包含 `v1.0.4`，且新 clone 应为干净工作树。clone 后切换到仓库根目录并重新读取 `INSTALL-FOR-AI.md`；继续执行时仍受用户发送的主提示词约束。
+核验输出必须精确包含 `v1.0.5`，且新 clone 应为干净工作树。clone 后切换到仓库根目录并重新读取 `INSTALL-FOR-AI.md`；继续执行时仍受用户发送的主提示词约束。
 
 ## 阶段 2：生成脱敏模型映射
 
@@ -141,7 +141,7 @@ py -3 scripts/manage.py install --model-map $ModelMap
 
 ### 更新流程
 
-更新必须使用阶段 1 已核验的固定 tag `v1.0.4` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
+更新必须使用阶段 1 已核验的固定 tag `v1.0.5` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
 
 macOS / Linux：
 
@@ -171,6 +171,7 @@ py -3 scripts/manage.py update
 
 - 模式（AI 自适配）、OS、仓库 tag、目标目录和最终 package version
 - 17 个 agent 各自绑定的模型，以及“上下文未知”等所有能力降级及原因
+- **模型多样性提示**：如果去重后实际只分到一个模型，明确说明“全部岗位共用一个模型，并行对比、生产/审查隔离和成本分层不生效”，并建议用户在 ZCode 中添加更多 provider（至少一个强推理、一个便宜快、一个支持图像输入的模型），之后可用更新提示词要求重新分配
 - dry-run 冲突、本地修改、incoming/restore 候选和保留项
 - state 路径与本次最近 snapshot 路径；若同版本未写入，明确说明未创建新 snapshot
 - 提醒用户新建 ZCode 会话生效
@@ -182,11 +183,11 @@ py -3 scripts/manage.py update
 
 ## 独立更新入口
 
-用户直接提出更新时，仍先执行阶段 0 并检查默认 state 路径，再按需执行阶段 1。state 同为 `1.0.4` 时不重复；旧版本按阶段 3 更新。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming、本地修改保护和临时 clone 清理结果。
+用户直接提出更新时，仍先执行阶段 0 并检查默认 state 路径，再按需执行阶段 1。state 同为 `1.0.5` 时不重复；旧版本按阶段 3 更新。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming、本地修改保护和临时 clone 清理结果。
 
 ## 卸载流程
 
-卸载先检查默认 state `~/.zcode/agents/.tony-agents-pack/state.json`（Windows 为 `%USERPROFILE%\.zcode\agents\.tony-agents-pack\state.json`），再执行阶段 1 获取并核验 `v1.0.4`。确认 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
+卸载先检查默认 state `~/.zcode/agents/.tony-agents-pack/state.json`（Windows 为 `%USERPROFILE%\.zcode\agents\.tony-agents-pack\state.json`），再执行阶段 1 获取并核验 `v1.0.5`。确认 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
 
 macOS / Linux：
 
