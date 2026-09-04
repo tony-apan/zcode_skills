@@ -331,7 +331,7 @@ def validate_package(verbose: bool = True) -> bool:
             )
             if any(re.search(pattern, text) for pattern in direct_read_patterns):
                 errors.append("{} instructs AI to read config.json directly".format(filename))
-            if "scripts/model_inventory.py" not in text or "/tmp/tony-agents-model-inventory.json" not in text:
+            if "scripts/model_inventory.py" not in text or "model-inventory" not in text:
                 errors.append("{} does not document the sanitized model inventory helper".format(filename))
         except (OSError, UnicodeError) as exc:
             errors.append("cannot read {}: {}".format(filename, exc))
@@ -384,13 +384,15 @@ class Manager:
         return snapshot
 
     @transactional("install")
-    def install(self, dry_run: bool, model_map_path: Optional[str]) -> None:
-        if self.load_state() is not None:
+    def install(self, dry_run: bool, model_map_path: Optional[str], force: bool = False) -> None:
+        previous_state = self.load_state()
+        if previous_state is not None and not force:
             raise PackError("package state already exists; use update instead")
         agents = source_agents()
         model_map = read_model_map(model_map_path, list(agents))
         collisions = [name for name in agents if (self.target_dir / (name + ".md")).exists()]
-        print("Install plan: {} agents, {} conflict(s)".format(len(agents), len(collisions)))
+        prefix = "Force install" if previous_state is not None else "Install"
+        print("{} plan: {} agents, {} conflict(s)".format(prefix, len(agents), len(collisions)))
         for name in collisions:
             print("CONFLICT {} (will back up before overwrite)".format(self.target_dir / (name + ".md")))
         if dry_run:
@@ -398,13 +400,30 @@ class Manager:
             return
         self.target_dir.mkdir(parents=True, exist_ok=True)
         operation_id = unique_id()
-        self._active_snapshot = self.create_snapshot(list(agents), "install")
+        if previous_state is not None:
+            snapshot_names = sorted(set(agents) | set(previous_state["files"]))
+            self._active_snapshot = self.create_snapshot(snapshot_names, "force-install")
+            self.state_file.unlink()
+        else:
+            self._active_snapshot = self.create_snapshot(list(agents), "install")
         records: Dict[str, dict] = {}
         for name, source in agents.items():
             target = self.target_dir / source.name
-            preexisting = target.exists()
+            previous_record = previous_state["files"].get(name) if previous_state is not None else None
+            preexisting = target.exists() and previous_record is None
             backup_path: Optional[Path] = None
-            if preexisting:
+            previous_backup: Optional[Path] = None
+            if isinstance(previous_record, dict):
+                backup_value = previous_record.get("backup_path")
+                if isinstance(backup_value, str) and backup_value:
+                    candidate = Path(backup_value)
+                    if candidate.is_file():
+                        previous_backup = candidate
+            if previous_backup is not None:
+                backup_path = self.backups_dir / operation_id / source.name
+                atomic_write(backup_path, previous_backup.read_bytes())
+                preexisting = True
+            elif preexisting:
                 backup_path = self.backups_dir / operation_id / source.name
                 atomic_write(backup_path, target.read_bytes())
             rendered = render_agent(source.read_text(encoding="utf-8"), model_map.get(name, {}))
@@ -509,9 +528,33 @@ class Manager:
                             current_fields[key] = value
                 except PackError:
                     pass
-            fields = dict(model_map[name]) if name in model_map else current_fields
+            if not current_fields:
+                base_value = record.get("base_path")
+                base_path = Path(base_value) if isinstance(base_value, str) and base_value else None
+                if base_path is not None and base_path.is_file():
+                    try:
+                        base_metadata = parse_frontmatter(base_path.read_text(encoding="utf-8"))
+                        for key in ("model", "thoughtLevel"):
+                            value = base_metadata.get(key)
+                            if isinstance(value, str):
+                                current_fields[key] = value
+                    except (OSError, UnicodeError, PackError):
+                        pass
+            if not target.exists():
+                fields = current_fields or dict(model_map.get(name, {}))
+            else:
+                fields = dict(model_map[name]) if name in model_map else current_fields
             remote = render_agent(source.read_text(encoding="utf-8"), fields)
-            unmodified = target.exists() and sha256_file(target) == record.get("installed_sha")
+            if not target.exists():
+                validate_agent_text(remote, name)
+                atomic_write(target, remote.encode("utf-8"))
+                base_path = self.bases_dir / update_id / source.name
+                atomic_write(base_path, remote.encode("utf-8"))
+                record.update({"source_sha": sha256_file(source), "installed_sha": sha256_file(target), "base_path": str(base_path), "operation_time": now_iso()})
+                new_records[name] = record
+                print("Reinstalled missing {}".format(name))
+                continue
+            unmodified = sha256_file(target) == record.get("installed_sha")
             installed_text: Optional[str] = None
             if unmodified:
                 installed_text = remote
@@ -706,6 +749,8 @@ def build_parser() -> argparse.ArgumentParser:
         child.add_argument("--dry-run", action="store_true")
         child.add_argument("--model-map", metavar="PATH")
         child.add_argument("--target-dir", type=Path, default=Path.home() / ".zcode" / "agents")
+        if command == "install":
+            child.add_argument("--force", action="store_true", help="replace existing package state")
     rollback = subparsers.add_parser("rollback", help="restore a pre-operation snapshot")
     rollback.add_argument("snapshot", nargs="?", default="latest")
     rollback.add_argument("--dry-run", action="store_true")
@@ -723,7 +768,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 0 if validate_package() else 1
         manager = Manager(args.target_dir)
         if args.command == "install":
-            manager.install(args.dry_run, args.model_map)
+            manager.install(args.dry_run, args.model_map, args.force)
         elif args.command == "update":
             manager.update(args.dry_run, args.model_map)
         elif args.command == "rollback":

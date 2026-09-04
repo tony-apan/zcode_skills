@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 from contextlib import redirect_stderr, redirect_stdout
 import io
+import re
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -149,6 +150,57 @@ class ManageTests(unittest.TestCase):
         self.assertEqual(Path(record["backup_path"]).read_bytes(), original)
         self.assertNotEqual((self.target / "coder.md").read_bytes(), original)
 
+    def test_force_install_after_partial_uninstall_reinstalls_all_and_snapshots_modified(self):
+        self.target.mkdir(parents=True)
+        original = b"preexisting writer\n"
+        (self.target / "writer.md").write_bytes(original)
+        manager = self.install()
+        modified = self.target / "writer.md"
+        modified.write_text(modified.read_text(encoding="utf-8") + "\nLOCAL CHANGE\n", encoding="utf-8")
+        modified_before = modified.read_bytes()
+        manager.uninstall(False)
+        self.assertEqual(set(manager.load_state(required=True)["files"]), {"writer"})
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            manager.install(False, None, force=True)
+
+        self.assertEqual(len(list(self.target.glob("*.md"))), manage.EXPECTED_AGENT_COUNT)
+        state = manager.load_state(required=True)
+        self.assertEqual(len(state["files"]), manage.EXPECTED_AGENT_COUNT)
+        writer_record = state["files"]["writer"]
+        self.assertTrue(writer_record["preexisting"])
+        self.assertEqual(Path(writer_record["backup_path"]).read_bytes(), original)
+        snapshots = sorted(manager.snapshots_dir.iterdir())
+        manifest = json.loads((snapshots[-1] / "snapshot.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["operation"], "force-install")
+        self.assertEqual((snapshots[-1] / "files" / "writer.md").read_bytes(), modified_before)
+        self.assertIn("Force install plan", output.getvalue())
+
+    def test_install_parser_accepts_dry_run_with_force(self):
+        args = manage.build_parser().parse_args(["install", "--dry-run", "--force"])
+        self.assertTrue(args.dry_run)
+        self.assertTrue(args.force)
+
+    def test_install_dry_run_with_state_requires_force_and_force_does_not_write(self):
+        manager = self.install()
+        state_before = manager.state_file.read_bytes()
+        agents_before = self.installed_agent_bytes()
+        snapshots_before = sorted(manager.snapshots_dir.iterdir())
+
+        with self.assertRaisesRegex(manage.PackError, "package state already exists"):
+            manager.install(True, None)
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            manager.install(True, None, force=True)
+
+        self.assertIn("Force install plan", output.getvalue())
+        self.assertIn("DRY-RUN: no files changed", output.getvalue())
+        self.assertEqual(manager.state_file.read_bytes(), state_before)
+        self.assertEqual(self.installed_agent_bytes(), agents_before)
+        self.assertEqual(sorted(manager.snapshots_dir.iterdir()), snapshots_before)
+
     def test_update_dry_run_reports_set_changes_without_writes(self):
         manager = self.install()
         state_before = manager.state_file.read_bytes()
@@ -241,6 +293,27 @@ class ManageTests(unittest.TestCase):
         state = manager.load_state(required=True)
         self.assertEqual(state["files"]["coder"]["installed_sha"], manage.sha256_file(self.target / "coder.md"))
 
+    def test_update_reinstalls_missing_agent(self):
+        model_map = self.temp / "model-map.json"
+        model_map.write_text(json.dumps({"coder": {"model": "custom:test:coder", "thoughtLevel": "high"}}), encoding="utf-8")
+        manager = self.manager()
+        manager.install(False, str(model_map))
+        target = self.target / "coder.md"
+        target.unlink()
+        output = io.StringIO()
+
+        with redirect_stdout(output):
+            manager.update(False, None)
+
+        self.assertTrue(target.is_file())
+        metadata = manage.parse_frontmatter(target.read_text(encoding="utf-8"))
+        self.assertEqual(metadata["model"], "custom:test:coder")
+        self.assertEqual(metadata["thoughtLevel"], "high")
+        self.assertIn("Reinstalled missing coder", output.getvalue())
+        self.assertFalse(target.with_name(target.name + ".tony-agents-pack.incoming").exists())
+        state = manager.load_state(required=True)
+        self.assertEqual(state["files"]["coder"]["installed_sha"], manage.sha256_file(target))
+
     @unittest.skipUnless(shutil.which("git"), "git is required for merge-conflict coverage")
     def test_update_conflict_preserves_local_and_writes_incoming(self):
         manager = self.install()
@@ -305,11 +378,16 @@ class ManageTests(unittest.TestCase):
             text = (self.package / filename).read_text(encoding="utf-8")
             self.assertIn("ZCode 专用", text, filename)
 
-    def test_release_version_and_changelog_are_1_0_2(self):
+    def test_release_version_matches_latest_changelog(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
         changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
-        self.assertEqual(plugin["version"], "1.0.3")
-        self.assertIn("## [1.0.3]", changelog)
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        changelog_match = re.search(r"^## \[(\d+\.\d+\.\d+)\]", changelog, re.MULTILINE)
+        prompt_match = re.search(r"tag=v(\d+\.\d+\.\d+)", readme)
+        self.assertIsNotNone(changelog_match)
+        self.assertIsNotNone(prompt_match)
+        self.assertEqual(plugin["version"], changelog_match.group(1))
+        self.assertEqual(plugin["version"], prompt_match.group(1))
         self.assertIn("17 个 `agents/*.md` 岗位定义与契约未改动", changelog)
 
     def test_readme_first_screen_has_beginner_prerequisites(self):
@@ -325,6 +403,7 @@ class ManageTests(unittest.TestCase):
             "至少配置一个可用模型/provider",
             "Python >= 3.9",
             "PowerShell 5.1+",
+            "~/.zcode/agents",
             "## 3 步自动安装",
         ):
             self.assertIn(marker, first_screen)
@@ -336,16 +415,21 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v1.0.3",
+            "tag=v1.0.4",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
-            "脱敏 JSON",
             "install --dry-run",
-            "同版本不重复",
+            "同为 1.0.4",
             "$env:TEMP",
             "mktemp",
+            "以本提示词为准",
+            "CONFLICT 或 LOCAL CHANGE",
+            "明确确认",
+            "删除临时 clone",
         ):
             self.assertIn(marker, prompt)
+        self.assertNotIn("先确认当前客户端是 ZCode", prompt)
+        self.assertNotIn("确认 ZCode 至少", prompt)
 
     def test_docs_have_no_legacy_repo_prefix_or_machine_paths(self):
         for filename in ("README.md", "INSTALL-FOR-AI.md"):
@@ -358,22 +442,29 @@ class ManageTests(unittest.TestCase):
     def test_bootstrap_protocol_covers_required_stages_and_platforms(self):
         protocol = (self.package / "INSTALL-FOR-AI.md").read_text(encoding="utf-8")
         for marker in (
-            "## 阶段 0：环境预检",
+            "## 阶段 0：环境与 state 预检",
             "## 阶段 1：获取并核验固定版本",
             "## 阶段 2：生成脱敏模型映射",
-            "## 阶段 3：选择 install 或 update",
-            "## 阶段 4：完成报告",
-            "--branch v1.0.3 --single-branch --depth 1",
+            "## 阶段 3：执行 install、update 或强制重装",
+            "## 阶段 4：完成报告与清理",
+            "--branch v1.0.4 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同版本不重复",
+            "同为 `1.0.4`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
             "install --dry-run --model-map",
             "update --dry-run",
             "uninstall --dry-run",
+            "以本提示词为准",
+            "CONFLICT` 或 `LOCAL CHANGE",
+            "Reinstalled missing",
+            "上下文未知",
+            "删除本次创建的临时 clone 目录",
         ):
             self.assertIn(marker, protocol)
+        self.assertNotIn("可复用", protocol)
+        self.assertNotIn("当前客户端确为 ZCode", protocol)
 
     def test_workflow_covers_all_supported_script_platforms(self):
         workflow = (self.package / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
@@ -382,6 +473,7 @@ class ManageTests(unittest.TestCase):
         self.assertIn("actions/setup-python@v5", workflow)
         self.assertIn("$Target = Join-Path $env:RUNNER_TEMP 'tony-agents-dry-run'", workflow)
         self.assertIn("scripts/install.ps1 --dry-run --target-dir $Target", workflow)
+        self.assertIn('./scripts/install.sh --dry-run --target-dir "$RUNNER_TEMP/tony-agents-sh"', workflow)
 
     def test_update_model_map_overrides_model_and_removes_old_thought_level(self):
         initial_map = self.temp / "initial-model-map.json"

@@ -2,6 +2,16 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [1.0.4] — 2026-09-04
+
+### 修正
+- update 会直接重装 state 中仍受管理但目标已缺失的 agent，并报告 `Reinstalled missing`，同时保留可恢复的本地模型字段
+- install 新增显式 `--force` 重装：先快照旧 state 与新包 agent 并集，迁移有效历史备份，再完整安装；dry-run 保持零写入
+- AI 安装协议改为先检查默认 state 再分流，移除无法执行的客户端版本/模型存在性预检，并从脱敏 inventory 判断 provider/model 前提
+- inventory、model-map 与 clone 全部使用 mktemp/GUID 唯一路径；固定 tag、文档优先级、冲突人工确认、未知上下文降级和临时目录清理规则进一步收紧
+- Ubuntu/macOS CI 增加 shell wrapper 的真实 dry-run，版本一致性测试改为动态比对 plugin、changelog 首条和 README 固定 tag
+- 17 个 `agents/*.md` 岗位定义与契约未改动
+
 ## [1.0.3] — 2026-09-04
 
 ### 修正
@@ -20,7 +30,7 @@
 ## [1.0.1] — 2026-09-04
 
 ### 修正
-- 线上仓库名改为 `tony-apan/zcode_skills`，公开 URL 与 macOS/Windows clone 命令去掉 `010` 前缀
+- v1.0.0 发布时线上仓库名已经是 `tony-apan/zcode_skills`；本版本补充 Windows CI 验证并同步安装文档
 - Ubuntu、macOS、Windows 三平台 GitHub Actions 全部通过；Windows 上已实际完成 Python 3.9 全套测试与 PowerShell 安装器 dry-run
 - README 默认安装 tag 更新为 `v1.0.1`，兼容性状态改为有证据的实际结论
 

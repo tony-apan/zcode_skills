@@ -27,6 +27,10 @@ jobs:
         if: runner.os != 'Windows'
         shell: sh
         run: sh -n scripts/install.sh scripts/release.sh
+      - name: Check shell installer dry-run
+        if: runner.os != 'Windows'
+        shell: sh
+        run: ./scripts/install.sh --dry-run --target-dir "$RUNNER_TEMP/tony-agents-sh"
       - name: Check PowerShell installer dry-run
         if: runner.os == 'Windows'
         shell: powershell
