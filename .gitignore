@@ -1,0 +1,13 @@
+.DS_Store
+*.log
+.claude/
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.tony-agents-pack/
+*.tony-agents-pack.incoming
+*.tony-agents-pack.restore
