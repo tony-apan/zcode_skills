@@ -305,6 +305,76 @@ class ManageTests(unittest.TestCase):
             text = (self.package / filename).read_text(encoding="utf-8")
             self.assertIn("ZCode 专用", text, filename)
 
+    def test_release_version_and_changelog_are_1_0_2(self):
+        plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertEqual(plugin["version"], "1.0.2")
+        self.assertIn("## [1.0.2]", changelog)
+        self.assertIn("17 个 `agents/*.md` 岗位定义与契约未改动", changelog)
+
+    def test_readme_first_screen_has_beginner_prerequisites(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        first_screen = "\n".join(readme.splitlines()[:60])
+        for marker in (
+            "# ZCode 专用",
+            "安全安装 17 个智能体",
+            "必须先安装 ZCode",
+            "不是独立软件",
+            "不能直接在 ChatGPT 或 Claude 网页中使用",
+            "ZCode >= 3.10.2",
+            "至少配置一个可用模型/provider",
+            "Python >= 3.9",
+            "PowerShell 5.1+",
+            "## 3 步自动安装",
+        ):
+            self.assertIn(marker, first_screen)
+
+    def test_readme_primary_prompt_is_self_contained_and_safe(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        prompt_start = readme.index("请在 ZCode 中自动安装这个智能体包")
+        prompt_end = readme.index("\n```", prompt_start)
+        prompt = readme[prompt_start:prompt_end]
+        for marker in (
+            "repo=https://github.com/tony-apan/zcode_skills",
+            "tag=v1.0.2",
+            "INSTALL-FOR-AI.md",
+            "scripts/model_inventory.py",
+            "脱敏 JSON",
+            "install --dry-run",
+            "同版本不重复",
+            "$env:TEMP",
+            "mktemp",
+        ):
+            self.assertIn(marker, prompt)
+
+    def test_docs_have_no_legacy_repo_prefix_or_machine_paths(self):
+        for filename in ("README.md", "INSTALL-FOR-AI.md"):
+            text = (self.package / filename).read_text(encoding="utf-8")
+            self.assertNotIn("010_zcode_skills", text, filename)
+            self.assertNotIn("github.com/tony-apan/010", text, filename)
+            self.assertNotIn("/Users/", text, filename)
+            self.assertNotIn("v1.0.1 --", text, filename)
+
+    def test_bootstrap_protocol_covers_required_stages_and_platforms(self):
+        protocol = (self.package / "INSTALL-FOR-AI.md").read_text(encoding="utf-8")
+        for marker in (
+            "## 阶段 0：环境预检",
+            "## 阶段 1：获取并核验固定版本",
+            "## 阶段 2：生成脱敏模型映射",
+            "## 阶段 3：选择 install 或 update",
+            "## 阶段 4：完成报告",
+            "--branch v1.0.2 --single-branch --depth 1",
+            "https://github.com/tony-apan/zcode_skills",
+            "同版本不重复",
+            "严禁直接 Read/cat ZCode config",
+            "macOS / Linux",
+            "Windows PowerShell 5.1+",
+            "install --dry-run --model-map",
+            "update --dry-run",
+            "uninstall --dry-run",
+        ):
+            self.assertIn(marker, protocol)
+
     def test_workflow_covers_all_supported_script_platforms(self):
         workflow = (self.package / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
         for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):

@@ -1,269 +1,189 @@
-# tony-agents-pack：ZCode 专用智能体包
+# ZCode 专用：tony-agents-pack
 
-这是仅面向 ZCode 的 17 个流水线子智能体包，覆盖工程生产、内容与获客、专项审查、运行验证和终审收口。发布版不绑定模型，可作为 ZCode 插件使用，也可通过跨平台安装器安全注入本地模型映射；不声明兼容其他 AI 客户端。
+[![ZCode](https://img.shields.io/badge/ZCode-%3E%3D%203.10.2-111827)](https://github.com/tony-apan/zcode_skills) [![Agents](https://img.shields.io/badge/agents-17-0f766e)](https://github.com/tony-apan/zcode_skills/tree/v1.0.2/agents) [![Version](https://img.shields.io/badge/version-v1.0.2-b45309)](https://github.com/tony-apan/zcode_skills/releases/tag/v1.0.2)
 
-仓库：https://github.com/tony-apan/zcode_skills
+把仓库链接发给 ZCode 里的 AI，它会根据本地已配置的模型自动分配并安全安装 17 个智能体。
 
-## 兼容性
+> **使用前提：必须先安装 ZCode。** 这不是独立软件，也不能直接在 ChatGPT 或 Claude 网页中使用。请从 ZCode 官方渠道安装，并完成首次启动；本文不提供未经可靠确认的官方 URL。
 
-| 项目 | 支持状态 | 说明 |
-|---|---|---|
-| ZCode 3.10.2 | 已验证 | 最低支持版本；不声明其他客户端兼容性 |
-| macOS | 本机实际验证 | Python 安装器、agent 配置和 shell wrapper 已在本机验证 |
-| Windows | GitHub Actions 已验证 | Python 核心安装器、27 项测试和 PowerShell 安装器 dry-run 已在 `windows-latest` + Python 3.9 通过 |
-| Linux | 脚本与 CI 兼容 | Python 测试和 CI 可运行；不声明 ZCode 桌面客户端已验证 |
+## 安装前提
 
-运行要求：Python >= 3.9。Windows wrapper 要求 PowerShell 5.1+。安装和无冲突更新不依赖 Git；只有三方合并本地修改、处理更新冲突以及获取版本时需要 Git。更新遇到本地修改且 Git 不可用时，安装器保留原文件并生成 `*.tony-agents-pack.incoming`。
+- ZCode >= 3.10.2，并且至少配置一个可用模型/provider
+- Git
+- Python >= 3.9
+- Windows 另需 PowerShell 5.1+
 
-## 三种安装模式
+AI 会先确认 ZCode、操作系统、Git、Python 和目标 tag。Git 或 Python 不满足时会停止并报告，不会继续安装。
 
-三种模式互斥，只选一种。不要把插件模式与脚本/AI 模式混装到同一环境。
+## 3 步自动安装
 
-| 模式 | 适用场景 | 模型配置 | 更新方式 |
-|---|---|---|---|
-| 插件模式 | 最快启用 | 零配置，跟随默认模型；能力可能降级 | ZCode 插件管理 |
-| AI 自适配 | 推荐，模型较多 | AI 按能力白名单生成 model-map | `manage.py update` |
-| 脚本模式 | 明确知道模型 ID | 手写 model-map，或不绑定模型 | `manage.py update` |
-
-## 安装
-
-macOS / Linux（sh）：
-
-```sh
-git clone --branch v1.0.1 --depth 1 https://github.com/tony-apan/zcode_skills.git
-cd zcode_skills
-python3 scripts/manage.py validate
-./scripts/install.sh --dry-run
-./scripts/install.sh
-```
-
-Windows（PowerShell 5.1+）：
-
-```powershell
-git clone --branch v1.0.1 --depth 1 https://github.com/tony-apan/zcode_skills.git
-Set-Location zcode_skills
-py -3 scripts/manage.py validate
-./scripts/install.ps1 --dry-run
-./scripts/install.ps1
-```
-
-Windows 没有 Python Launcher（`py`）时，将文档中的 `py -3` 替换为 `python`；`install.ps1` 也会自动回退到 `python`。默认目标目录由安装器按当前系统处理，无需在 PowerShell 中使用 `~`。
-
-项目级或测试安装：
-
-```sh
-# macOS / Linux
-python3 scripts/manage.py install --dry-run --target-dir .zcode/agents
-python3 scripts/manage.py install --target-dir .zcode/agents
-```
-
-```powershell
-# Windows
-py -3 scripts/manage.py install --dry-run --target-dir .zcode/agents
-py -3 scripts/manage.py install --target-dir .zcode/agents
-```
-
-## AI 自适配
-
-把仓库交给 ZCode 会话并说：
+1. 在 ZCode 中打开一个新会话。
+2. 复制下面**唯一主提示词**，完整发送，无需修改任何变量。
+3. 等 AI 汇报完成后，再新建一个会话，让 17 个智能体生效。
 
 ```text
-严格按 INSTALL-FOR-AI.md 生成模型映射并安装；三种模式只选 AI 自适配，不混装，并且只执行当前操作系统对应的命令分支。
+请在 ZCode 中自动安装这个智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.2。严格执行以下要求：
+1. 先确认当前客户端是 ZCode 且版本 >=3.10.2，识别 OS，并确认 ZCode 至少有一个可用模型/provider；检查 Git、Python >=3.9，Windows 还要 PowerShell >=5.1。任何前提不满足或无法确认都停止，并原样报告检查结果。
+2. 只选“AI 自适配”模式，禁止同时使用插件或手工模式。按固定 tag v1.0.2 将 repo clone 到唯一的新临时目录：Windows 使用 $env:TEMP 下的 GUID 目录，macOS/Linux 使用 mktemp 创建的目录。不得覆盖或删除任何已有目录，不得从 main 等浮动分支安装，不得使用 curl|sh 或其他远程脚本管道。
+3. clone 成功并核验当前 HEAD 确属 v1.0.2 后，重新读取 clone 内的 INSTALL-FOR-AI.md，并严格按其阶段执行；不得依赖聊天中转述的协议。
+4. 模型适配阶段只能运行 scripts/model_inventory.py 生成脱敏 inventory；不得直接 Read/cat/输出 ZCode config 原文。AI 只能读取 helper 生成的脱敏 JSON，据此为 17 个岗位生成临时 model-map。不得泄露密钥、token、options、Authorization、baseURL 或未知字段。
+5. 依次运行 scripts/manage.py validate、带 --model-map 的 install --dry-run。检查 dry-run 的目标、冲突和备份计划后，才运行正式 install。若目标已有 .tony-agents-pack/state.json，不得执行 install：只读取 state 中无 secrets 的 package/version 判断；同版本不重复操作，版本不同时按协议和用户安装意图改走 update。
+6. 不手工复制 agents，不按字符串位置改 frontmatter，不无备份覆盖。任一步失败立即停止，保留现场并原样报告失败命令和错误，不自行绕过。
+7. 完成后汇报：AI 自适配模式、OS、目标目录、17 个岗位各自模型、所有降级项、冲突或 incoming/restore 候选、state 路径、最近 snapshot 路径，并提醒我新建会话生效。不得汇报 inventory 白名单以外的配置值。
 ```
 
-AI 先调用本地脱敏 helper，只读取生成的脱敏 JSON，再生成 model-map。macOS / Linux（sh）：
+自动安装是唯一推荐入口。完整安全协议见 [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md)。
 
-```sh
-python3 scripts/model_inventory.py > /tmp/tony-agents-model-inventory.json
+## 17 个岗位
+
+| 流水线 | 智能体 | 用途 |
+|---|---|---|
+| 工程 | `coder`、`coder-gpt`、`coder-ds`、`coder-kimi`、`frontend` | 并行实现、方案对比、前端交付 |
+| 内容 | `writer`、`writer-pro` | 内容生产与增强稿 |
+| SEO / 外贸 | `seoer`、`huoke`、`outreach`、`jiankong` | 选题、获客、开发信、内容监控 |
+| 核查 | `shencha`、`shencha-content`、`shencha-ui`、`verifier`、`shencha-final`、`tijian` | 静态审查、运行验证、终审、网站体检 |
+
+## 开始使用
+
+代码任务：
+
+```text
+请让 coder 实现这个修复，再让 shencha 做静态工程审查、verifier 做运行验证，最后交 shencha-final 终审收口。
 ```
 
-Windows（PowerShell）：
+SEO 内容：
 
-```powershell
-$Inventory = Join-Path $env:TEMP 'tony-agents-model-inventory.json'
-py -3 scripts/model_inventory.py > $Inventory
+```text
+请让 seoer 基于搜索证据产出选题 brief，交 writer 成稿，再由 shencha-content 验收事实、搜索意图和转化路径。
 ```
 
-完整的平台命令和安全边界见 [INSTALL-FOR-AI.md](INSTALL-FOR-AI.md)。model-map 格式：
+外贸开发：
 
-```json
-{
-  "coder": {
-    "model": "custom:provider-id:model-name",
-    "thoughtLevel": "high"
-  },
-  "writer": {
-    "model": "custom:provider-id:model-name"
-  }
-}
+```text
+请让 huoke 筛选并核验目标客户，交 outreach 生成适合目标市场的开发触达内容，并明确证据等级与合规限制。
 ```
 
-`thoughtLevel` 可省略。安装器会将字段作为 frontmatter 顶层键写在 closing `---` 前，并在写入后重新解析验证。
+## 更新
 
-## 插件模式
+在 ZCode 新会话中发送：
 
-在 ZCode 的插件管理中添加：
+```text
+请安全更新这个 ZCode 智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.2。先确认 ZCode/OS/Git/Python 前提；检查目标 .tony-agents-pack/state.json 中无 secrets 的 package/version，同为 1.0.2 时不要重复更新并直接报告。否则把固定 tag v1.0.2 clone 到唯一新临时目录，核验 tag 后读取其中 INSTALL-FOR-AI.md 的“更新流程”。依次运行 validate、update --dry-run，说明本地修改、备份计划和 incoming 风险，确认 dry-run 无异常后再正式 update。必须保护本地修改，冲突时保留原文件并报告 incoming；不得从浮动分支覆盖，不得直接读取 ZCode config，不得手工复制 agents。只有我明确要求“重新分配模型”时才运行脱敏 inventory 并生成新的 model-map。完成后报告版本、目标、冲突、state、snapshot 和新会话生效；失败立即停止并原样报告。
+```
+
+## 卸载
+
+在 ZCode 新会话中发送：
+
+```text
+请安全卸载这个 ZCode 智能体包。使用 repo=https://github.com/tony-apan/zcode_skills 的固定 tag v1.0.2 仓库；如本地没有已核验为该 tag 的副本，就 clone 到唯一新临时目录，禁止覆盖已有目录。读取 clone 内 INSTALL-FOR-AI.md 的“卸载流程”，确认目标 state 属于 tony-agents-pack 后，先运行 uninstall --dry-run，向我解释将删除、恢复、保留的文件和快照计划；检查无误后正式 uninstall。不得删除用户修改，必须报告保留项、*.tony-agents-pack.restore 候选和 snapshot 路径。任一步失败立即停止并原样报告。
+```
+
+<details>
+<summary><strong>其他安装模式（高级；与 AI 自适配互斥）</strong></summary>
+
+三种模式只能选一种，禁止混装：
+
+| 模式 | 模型配置 | 更新方式 |
+|---|---|---|
+| AI 自适配（推荐） | AI 读取脱敏 inventory 后分配 | `manage.py update` |
+| 插件模式 | 跟随默认模型，部分岗位可能降级 | ZCode 插件管理 |
+| 手工脚本模式 | 用户明确提供 model-map，或不绑定模型 | `manage.py update` |
+
+插件模式可在 ZCode 插件管理中添加：
 
 ```text
 https://github.com/tony-apan/zcode_skills
 ```
 
-插件模式零配置，但没有逐 agent 模型映射。依赖图像、长上下文或强推理的岗位可能随默认模型能力降级；需要确定性能力时使用 AI 自适配模式，不要在插件安装之上再脚本安装。
-
-## 调用示例
-
-在 ZCode 中按任务点名 agent，例如：
-
-```text
-请让 coder 实现这个修复，再让 shencha 做静态审查、verifier 复跑测试，最后交 shencha-final 收口。
-```
-
-```text
-请让 seoer 先产出选题 brief，再交 writer 成稿，最后由 shencha-content 验收。
-```
-
-## 更新
-
-始终固定到明确 tag，不从浮动分支直接覆盖本地安装。macOS / Linux（sh）：
+手工脚本模式必须先自行准备 model-map，再固定版本操作。macOS / Linux：
 
 ```sh
-VERSION=v1.1.0
-git fetch --tags origin
-git checkout --detach "$VERSION"
+git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
+cd zcode_skills
 python3 scripts/manage.py validate
-python3 scripts/manage.py update --dry-run
-python3 scripts/manage.py update
+python3 scripts/manage.py install --dry-run --model-map /tmp/tony-agents-model-map.json
+python3 scripts/manage.py install --model-map /tmp/tony-agents-model-map.json
 ```
 
-Windows（PowerShell）：
+Windows PowerShell 5.1+：
 
 ```powershell
-$Version = 'v1.1.0'
-git fetch --tags origin
-git checkout --detach $Version
+git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
+Set-Location zcode_skills
 py -3 scripts/manage.py validate
-py -3 scripts/manage.py update --dry-run
-py -3 scripts/manage.py update
-```
-
-带模型覆盖的更新：
-
-```sh
-# macOS / Linux
-python3 scripts/manage.py update --dry-run --model-map /tmp/tony-agents-model-map.json
-python3 scripts/manage.py update --model-map /tmp/tony-agents-model-map.json
-```
-
-```powershell
-# Windows
 $ModelMap = Join-Path $env:TEMP 'tony-agents-model-map.json'
-py -3 scripts/manage.py update --dry-run --model-map $ModelMap
-py -3 scripts/manage.py update --model-map $ModelMap
+py -3 scripts/manage.py install --dry-run --model-map $ModelMap
+py -3 scripts/manage.py install --model-map $ModelMap
 ```
 
-目标文件与上次安装 SHA 一致时直接更新。检测到用户修改时，安装器用上一版 base、当前 local、新版 remote 执行三方合并。agent 不在 model-map 时保留当前有效的 `model`/`thoughtLevel`；agent 在 model-map 时使用映射中的 `model`，只有映射显式提供 `thoughtLevel` 才写入，否则删除旧值。无冲突才写回；有冲突或 `git merge-file` 不可用时保留原文件，并生成 incoming 候选。
+Windows 没有 Python Launcher 时，把 `py -3` 替换为 `python`。项目级安装可在每条 install/update/uninstall/rollback 命令后传相同的 `--target-dir .zcode/agents`。
 
-新版新增 agent 时按初装规则安装，同名目标先备份；新版移除 agent 时只恢复或删除未被用户修改的文件，已修改或缺失的文件会保留并继续在 state 中跟踪。所有集合变化都发生在操作前快照之后。
+</details>
 
-## 备份与回滚
+<details>
+<summary><strong>兼容矩阵</strong></summary>
 
-每次正式 install/update/uninstall 前都会创建快照；初装遇同名文件还会先单独备份。状态和数据位于 `TARGET/.tony-agents-pack/` 下的 `state.json`、`backups/`、`bases/` 和 `snapshots/`。
+| 项目 | 状态 | 说明 |
+|---|---|---|
+| ZCode >= 3.10.2 | 最低要求 | 不声明兼容其他 AI 客户端 |
+| macOS | 已实际验证 | Python 管理器、agent 配置、shell wrapper |
+| Windows | v1.0.1 CI 已通过 | `windows-latest`、Python 3.9、PowerShell 安装器 dry-run；v1.0.2 待发布 CI |
+| Linux | 脚本与 CI 兼容 | 不声明 ZCode 桌面客户端已实际验证；v1.0.2 待发布 CI |
 
-预览并回滚最近快照：
+</details>
+
+<details>
+<summary><strong>安全、备份与回滚</strong></summary>
+
+- 安装器只使用 Python 3 标准库，写入使用同目录临时文件与原子替换。
+- `scripts/model_inventory.py` 在本机读取 ZCode 配置，但只输出 provider ID/enabled、模型名、context、输入模态、reasoning variants。
+- AI 不得直接读取配置原文，只能读取 `/tmp/tony-agents-model-inventory.json` 或 Windows `%TEMP%` 中对应的脱敏 JSON。
+- 不读取、输出或备份 `options`、API key、token、secret、Authorization、baseURL 或未知字段。
+- 正式 install/update/uninstall 前创建 snapshot；同名文件初装前另有 backup；本地修改冲突不会被覆盖。
+- 仓库不提供 `curl | sh`，也不允许手工字符串复制覆盖 agent。
+
+状态数据位于目标目录的 `.tony-agents-pack/`，包括 `state.json`、`backups/`、`bases/` 和 `snapshots/`。预览并回滚最近一次快照：
 
 ```sh
-# macOS / Linux
 python3 scripts/manage.py rollback latest --dry-run
 python3 scripts/manage.py rollback latest
 ```
 
-```powershell
-# Windows
-py -3 scripts/manage.py rollback latest --dry-run
-py -3 scripts/manage.py rollback latest
-```
+Windows 将 `python3` 换为 `py -3`。按 ID 回滚时，应读取 snapshots 下真实目录名，不猜测 ID。
 
-如需按 ID 恢复旧快照，从目标目录下 `.tony-agents-pack/snapshots/` 读取实际目录名，作为 `rollback` 的位置参数传入，不要猜测快照 ID。项目级安装的后续命令必须传相同的 `--target-dir`：
+</details>
 
-```sh
-# macOS / Linux
-python3 scripts/manage.py rollback latest --target-dir .zcode/agents
-```
+<details>
+<summary><strong>故障排查</strong></summary>
 
-```powershell
-# Windows
-py -3 scripts/manage.py rollback latest --target-dir .zcode/agents
-```
+**安装后看不到智能体**：智能体通常在新会话加载。新建会话；仍未出现时运行当前 tag 的 `scripts/manage.py validate`，并核对目标目录。
 
-## 卸载
+**`package state already exists`**：已经由脚本管理，不要重复 install。检查 state 的 package/version；同版本停止，其他版本走 update。
 
-macOS / Linux（sh）：
+**出现 `.tony-agents-pack.incoming`**：本地修改与新版冲突，或 Git 无法执行三方合并。原文件仍保留；对比候选后人工处理，不要删除 state。
 
-```sh
-python3 scripts/manage.py uninstall --dry-run
-python3 scripts/manage.py uninstall
-```
+**操作中途失败**：正式操作会先创建 snapshot，并尝试自动回滚。若自动回滚也失败，保留现场，先执行 `rollback latest --dry-run` 预览。
 
-Windows（PowerShell）：
+</details>
 
-```powershell
-py -3 scripts/manage.py uninstall --dry-run
-py -3 scripts/manage.py uninstall
-```
+<details>
+<summary><strong>版本与发布流程</strong></summary>
 
-只有当前 SHA 等于状态中 `installed_sha` 的包文件才会删除或恢复。安装前已存在的同名文件会从备份恢复；当前文件被用户修改时会保留，并生成恢复候选或报告。
+本包遵循 SemVer。MAJOR 表示破坏性契约变更，MINOR 表示向后兼容地新增 agent 或能力，PATCH 表示不改 agent 契约的修正。变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-## 常见问题
-
-### 安装后看不到智能体
-
-智能体列表通常在新会话加载。关闭当前会话并新建会话；仍未出现时重新运行当前平台对应的 `manage.py validate`，确认目标目录及 `--target-dir` 参数一致。
-
-### 提示 `package state already exists`
-
-这表示本包已经由脚本安装，不要重复执行 `install`；按“更新”章节先 dry-run 再更新。
-
-### 更新生成 `.tony-agents-pack.incoming`
-
-这表示本地修改与新版契约冲突，或系统没有可用的 Git。安装器已保留原文件；对比 incoming 候选并手工合并后，再运行当前平台对应的 `update --dry-run`。不要直接删除状态目录。
-
-### 安装或更新中途失败
-
-正式操作在写入前创建快照；中途异常会自动恢复本次操作前的文件和 state。若同时报告自动回滚失败，保留现场，按“备份与回滚”章节先预览最近快照。
-
-## 安全与隐私
-
-- 安装器只使用 Python 3 标准库，所有写入采用同目录临时文件加 `os.replace`
-- 不读取、输出或备份 ZCode 的 `options`、API key、token、secret、Authorization、baseURL
-- `scripts/model_inventory.py` 在本机进程内读取 ZCode 配置，stdout 只输出 provider ID/enabled、模型名、context、输入模态和 reasoning variants
-- AI 不得直接读取配置原文，只能读取 helper 生成的脱敏 JSON；模型映射必须通过 `--model-map` 显式传入
-- 正式覆盖前有快照；同名文件初装前有备份；本地修改更新冲突时不覆盖
-- 仓库不提供 `curl | sh` 安装方式
-
-## 版本策略
-
-遵循 SemVer：MAJOR 用于破坏性契约变更，MINOR 用于向后兼容地新增 agent 或能力，PATCH 用于不改契约的修正。变更记录见 [CHANGELOG.md](CHANGELOG.md)。
-
-## 发布者流程
-
-本仓库的 Ubuntu、macOS、Windows 三平台 CI 已在 `v1.0.0` 首次发布时全部通过；后续每个 tag 仍须以对应 GitHub Actions 结果为发布依据。
-
-macOS / Linux 发布者可运行 `./scripts/release.sh`。Windows 发布者在提交全部发布改动后使用：
+发布者在 macOS/Linux 可运行 `./scripts/release.sh`。Windows 发布前运行：
 
 ```powershell
 py -3 scripts/manage.py validate
 py -3 -m unittest discover -s tests -p 'test_*.py' -v
-$Version = py -3 -c "import json; print(json.load(open('.zcode-plugin/plugin.json', encoding='utf-8'))['version'])"
-git diff --quiet
-git diff --cached --quiet
-if (git status --porcelain) { throw 'Working tree is not clean' }
-git rev-parse -q --verify "refs/tags/v$Version" 2>$null
-if ($LASTEXITCODE -eq 0) { throw "Tag already exists: v$Version" }
-git tag -a "v$Version" -m "tony-agents-pack v$Version"
+py -3 -m py_compile scripts/manage.py scripts/model_inventory.py tests/test_manage.py tests/test_model_inventory.py
 ```
 
-创建 tag 后不自动 push。发布前确认 changelog 包含该版本，并以 GitHub Actions 三平台结果为准。
+随后确认工作区干净、changelog 包含插件版本、目标 tag 不存在，再创建 annotated tag。脚本不会自动 push；发布后以 Ubuntu、macOS、Windows 的 GitHub Actions 结果为准。v1.0.2 当前为待发布状态，不应在 CI 完成前声明已通过。
 
-## LICENSE
+</details>
+
+## License
 
 MIT License，Copyright (c) 2026 Tony (GitHub: tony-apan)。见 [LICENSE](LICENSE)。
