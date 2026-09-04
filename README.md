@@ -1,6 +1,6 @@
 # ZCode 专用：tony-agents-pack
 
-[![ZCode](https://img.shields.io/badge/ZCode-%3E%3D%203.10.2-111827)](https://github.com/tony-apan/zcode_skills) [![Agents](https://img.shields.io/badge/agents-17-0f766e)](https://github.com/tony-apan/zcode_skills/tree/v1.0.2/agents) [![Version](https://img.shields.io/badge/version-v1.0.2-b45309)](https://github.com/tony-apan/zcode_skills/releases/tag/v1.0.2)
+[![ZCode](https://img.shields.io/badge/ZCode-%3E%3D%203.10.2-111827)](https://github.com/tony-apan/zcode_skills) [![Agents](https://img.shields.io/badge/agents-17-0f766e)](https://github.com/tony-apan/zcode_skills/tree/v1.0.3/agents) [![Version](https://img.shields.io/badge/version-v1.0.3-b45309)](https://github.com/tony-apan/zcode_skills/releases/tag/v1.0.3)
 
 把仓库链接发给 ZCode 里的 AI，它会根据本地已配置的模型自动分配并安全安装 17 个智能体。
 
@@ -22,10 +22,10 @@ AI 会先确认 ZCode、操作系统、Git、Python 和目标 tag。Git 或 Pyth
 3. 等 AI 汇报完成后，再新建一个会话，让 17 个智能体生效。
 
 ```text
-请在 ZCode 中自动安装这个智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.2。严格执行以下要求：
+请在 ZCode 中自动安装这个智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.3。严格执行以下要求：
 1. 先确认当前客户端是 ZCode 且版本 >=3.10.2，识别 OS，并确认 ZCode 至少有一个可用模型/provider；检查 Git、Python >=3.9，Windows 还要 PowerShell >=5.1。任何前提不满足或无法确认都停止，并原样报告检查结果。
-2. 只选“AI 自适配”模式，禁止同时使用插件或手工模式。按固定 tag v1.0.2 将 repo clone 到唯一的新临时目录：Windows 使用 $env:TEMP 下的 GUID 目录，macOS/Linux 使用 mktemp 创建的目录。不得覆盖或删除任何已有目录，不得从 main 等浮动分支安装，不得使用 curl|sh 或其他远程脚本管道。
-3. clone 成功并核验当前 HEAD 确属 v1.0.2 后，重新读取 clone 内的 INSTALL-FOR-AI.md，并严格按其阶段执行；不得依赖聊天中转述的协议。
+2. 只选“AI 自适配”模式，禁止同时使用插件或手工模式。按固定 tag v1.0.3 将 repo clone 到唯一的新临时目录：Windows 使用 $env:TEMP 下的 GUID 目录，macOS/Linux 使用 mktemp 创建的目录。不得覆盖或删除任何已有目录，不得从 main 等浮动分支安装，不得使用 curl|sh 或其他远程脚本管道。
+3. clone 成功并核验当前 HEAD 确属 v1.0.3 后，重新读取 clone 内的 INSTALL-FOR-AI.md，并严格按其阶段执行；不得依赖聊天中转述的协议。
 4. 模型适配阶段只能运行 scripts/model_inventory.py 生成脱敏 inventory；不得直接 Read/cat/输出 ZCode config 原文。AI 只能读取 helper 生成的脱敏 JSON，据此为 17 个岗位生成临时 model-map。不得泄露密钥、token、options、Authorization、baseURL 或未知字段。
 5. 依次运行 scripts/manage.py validate、带 --model-map 的 install --dry-run。检查 dry-run 的目标、冲突和备份计划后，才运行正式 install。若目标已有 .tony-agents-pack/state.json，不得执行 install：只读取 state 中无 secrets 的 package/version 判断；同版本不重复操作，版本不同时按协议和用户安装意图改走 update。
 6. 不手工复制 agents，不按字符串位置改 frontmatter，不无备份覆盖。任一步失败立即停止，保留现场并原样报告失败命令和错误，不自行绕过。
@@ -68,7 +68,7 @@ SEO 内容：
 在 ZCode 新会话中发送：
 
 ```text
-请安全更新这个 ZCode 智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.2。先确认 ZCode/OS/Git/Python 前提；检查目标 .tony-agents-pack/state.json 中无 secrets 的 package/version，同为 1.0.2 时不要重复更新并直接报告。否则把固定 tag v1.0.2 clone 到唯一新临时目录，核验 tag 后读取其中 INSTALL-FOR-AI.md 的“更新流程”。依次运行 validate、update --dry-run，说明本地修改、备份计划和 incoming 风险，确认 dry-run 无异常后再正式 update。必须保护本地修改，冲突时保留原文件并报告 incoming；不得从浮动分支覆盖，不得直接读取 ZCode config，不得手工复制 agents。只有我明确要求“重新分配模型”时才运行脱敏 inventory 并生成新的 model-map。完成后报告版本、目标、冲突、state、snapshot 和新会话生效；失败立即停止并原样报告。
+请安全更新这个 ZCode 智能体包。repo=https://github.com/tony-apan/zcode_skills，tag=v1.0.3。先确认 ZCode/OS/Git/Python 前提；检查目标 .tony-agents-pack/state.json 中无 secrets 的 package/version，同为 1.0.3 时不要重复更新并直接报告。否则把固定 tag v1.0.3 clone 到唯一新临时目录，核验 tag 后读取其中 INSTALL-FOR-AI.md 的“更新流程”。依次运行 validate、update --dry-run，说明本地修改、备份计划和 incoming 风险，确认 dry-run 无异常后再正式 update。必须保护本地修改，冲突时保留原文件并报告 incoming；不得从浮动分支覆盖，不得直接读取 ZCode config，不得手工复制 agents。只有我明确要求“重新分配模型”时才运行脱敏 inventory 并生成新的 model-map。完成后报告版本、目标、冲突、state、snapshot 和新会话生效；失败立即停止并原样报告。
 ```
 
 ## 卸载
@@ -76,7 +76,7 @@ SEO 内容：
 在 ZCode 新会话中发送：
 
 ```text
-请安全卸载这个 ZCode 智能体包。使用 repo=https://github.com/tony-apan/zcode_skills 的固定 tag v1.0.2 仓库；如本地没有已核验为该 tag 的副本，就 clone 到唯一新临时目录，禁止覆盖已有目录。读取 clone 内 INSTALL-FOR-AI.md 的“卸载流程”，确认目标 state 属于 tony-agents-pack 后，先运行 uninstall --dry-run，向我解释将删除、恢复、保留的文件和快照计划；检查无误后正式 uninstall。不得删除用户修改，必须报告保留项、*.tony-agents-pack.restore 候选和 snapshot 路径。任一步失败立即停止并原样报告。
+请安全卸载这个 ZCode 智能体包。使用 repo=https://github.com/tony-apan/zcode_skills 的固定 tag v1.0.3 仓库；如本地没有已核验为该 tag 的副本，就 clone 到唯一新临时目录，禁止覆盖已有目录。读取 clone 内 INSTALL-FOR-AI.md 的“卸载流程”，确认目标 state 属于 tony-agents-pack 后，先运行 uninstall --dry-run，向我解释将删除、恢复、保留的文件和快照计划；检查无误后正式 uninstall。不得删除用户修改，必须报告保留项、*.tony-agents-pack.restore 候选和 snapshot 路径。任一步失败立即停止并原样报告。
 ```
 
 <details>
@@ -99,7 +99,7 @@ https://github.com/tony-apan/zcode_skills
 手工脚本模式必须先自行准备 model-map，再固定版本操作。macOS / Linux：
 
 ```sh
-git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
+git clone --branch v1.0.3 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
 cd zcode_skills
 python3 scripts/manage.py validate
 python3 scripts/manage.py install --dry-run --model-map /tmp/tony-agents-model-map.json
@@ -109,7 +109,7 @@ python3 scripts/manage.py install --model-map /tmp/tony-agents-model-map.json
 Windows PowerShell 5.1+：
 
 ```powershell
-git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
+git clone --branch v1.0.3 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills.git
 Set-Location zcode_skills
 py -3 scripts/manage.py validate
 $ModelMap = Join-Path $env:TEMP 'tony-agents-model-map.json'
@@ -128,8 +128,8 @@ Windows 没有 Python Launcher 时，把 `py -3` 替换为 `python`。项目级�
 |---|---|---|
 | ZCode >= 3.10.2 | 最低要求 | 不声明兼容其他 AI 客户端 |
 | macOS | 已实际验证 | Python 管理器、agent 配置、shell wrapper |
-| Windows | v1.0.1 CI 已通过 | `windows-latest`、Python 3.9、PowerShell 安装器 dry-run；v1.0.2 待发布 CI |
-| Linux | 脚本与 CI 兼容 | 不声明 ZCode 桌面客户端已实际验证；v1.0.2 待发布 CI |
+| Windows | GitHub Actions 已验证 | `windows-latest`、Python 3.9、PowerShell 安装器 dry-run 已通过；每个新 tag 仍以对应 Actions 结果为准 |
+| Linux | 脚本与 CI 已验证 | Ubuntu 上 Python 3.9 测试与 shell wrapper 已通过；不声明 ZCode 桌面客户端已实际验证 |
 
 </details>
 
@@ -180,7 +180,7 @@ py -3 -m unittest discover -s tests -p 'test_*.py' -v
 py -3 -m py_compile scripts/manage.py scripts/model_inventory.py tests/test_manage.py tests/test_model_inventory.py
 ```
 
-随后确认工作区干净、changelog 包含插件版本、目标 tag 不存在，再创建 annotated tag。脚本不会自动 push；发布后以 Ubuntu、macOS、Windows 的 GitHub Actions 结果为准。v1.0.2 当前为待发布状态，不应在 CI 完成前声明已通过。
+随后确认工作区干净、changelog 包含插件版本、目标 tag 不存在，再创建 annotated tag。脚本不会自动 push；每个发布版本都以 Ubuntu、macOS、Windows 对应的 GitHub Actions 结果为准。
 
 </details>
 

@@ -1,6 +1,6 @@
 # ZCode 专用 AI 自适配 Bootstrap 安装协议
 
-本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v1.0.2`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
+本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v1.0.3`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
 
 > 三种模式互斥：插件模式、AI 自适配模式、脚本手工模式只能选一种。本协议只执行 **AI 自适配**；禁止同时安装插件，禁止直接复制或覆盖 `agents/*.md`。
 
@@ -22,7 +22,7 @@
 3. 当前 OS 是 macOS、Linux 或 Windows，并且后续只执行对应分支。
 4. Git 可执行。
 5. Python >= 3.9；Windows 另需 PowerShell >= 5.1。
-6. 请求 tag 是固定的 `v1.0.2`，不是分支或其他版本。
+6. 请求 tag 是固定的 `v1.0.3`，不是分支或其他版本。
 
 Git、Python 或其他前提不满足时停止并报告。可用命令如下。
 
@@ -45,13 +45,13 @@ py -3 -c "import sys; print('.'.join(map(str, sys.version_info[:3]))); raise Sys
 
 ## 阶段 1：获取并核验固定版本
 
-如果已有仓库副本，只有同时满足以下条件才可复用：remote URL 与本协议仓库一致、工作树没有影响本次协议的未提交修改、当前 HEAD 精确位于 `v1.0.2`。任一条件不满足，就 clone 到**唯一的新临时目录**；不得 checkout、覆盖或删除原目录。
+如果已有仓库副本，只有同时满足以下条件才可复用：remote URL 与本协议仓库一致、工作树没有影响本次协议的未提交修改、当前 HEAD 精确位于 `v1.0.3`。任一条件不满足，就 clone 到**唯一的新临时目录**；不得 checkout、覆盖或删除原目录。
 
 macOS / Linux：
 
 ```sh
-WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v1.0.2.XXXXXX")
-git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
+WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v1.0.3.XXXXXX")
+git clone --branch v1.0.3 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
 git -C "$WORKTREE" describe --tags --exact-match HEAD
 git -C "$WORKTREE" status --short
 ```
@@ -59,13 +59,13 @@ git -C "$WORKTREE" status --short
 Windows PowerShell 5.1+：
 
 ```powershell
-$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v1.0.2-" + [guid]::NewGuid().ToString("N"))
-git clone --branch v1.0.2 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
+$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v1.0.3-" + [guid]::NewGuid().ToString("N"))
+git clone --branch v1.0.3 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
 git -C $Worktree describe --tags --exact-match HEAD
 git -C $Worktree status --short
 ```
 
-核验输出必须精确包含 `v1.0.2`，且新 clone 应为干净工作树。clone 后把工作目录切换到该仓库根目录，**重新读取此 `INSTALL-FOR-AI.md`**，以 clone 内协议为唯一后续依据。
+核验输出必须精确包含 `v1.0.3`，且新 clone 应为干净工作树。clone 后把工作目录切换到该仓库根目录，**重新读取此 `INSTALL-FOR-AI.md`**，以 clone 内协议为唯一后续依据。
 
 ## 阶段 2：生成脱敏模型映射
 
@@ -114,8 +114,8 @@ macOS/Linux 写入 `/tmp/tony-agents-model-map.json`；Windows 写入 `$env:TEMP
 - 不存在 state：按“首次安装”执行。
 - 存在 state：**不得执行 install**。只读取 state 中无 secrets 的 `package` 与 `version`。
 - `package` 不是 `tony-agents-pack`：停止并报告，不接管该 state。
-- `version` 已是 `1.0.2`：同版本不重复安装或更新，停止写入并报告。
-- `version` 不是 `1.0.2` 且用户意图是安装/升级：改走“更新流程”。
+- `version` 已是 `1.0.3`：同版本不重复安装或更新，停止写入并报告。
+- `version` 不是 `1.0.3` 且用户意图是安装/升级：改走“更新流程”。
 
 ### 首次安装
 
@@ -142,7 +142,7 @@ py -3 scripts/manage.py install --model-map $ModelMap
 
 ### 更新流程
 
-更新必须使用阶段 1 已核验的固定 tag `v1.0.2` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
+更新必须使用阶段 1 已核验的固定 tag `v1.0.3` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
 
 不重新分配，macOS / Linux：
 
@@ -179,11 +179,11 @@ py -3 scripts/manage.py update
 
 ## 独立更新入口
 
-用户直接提出更新时，仍执行阶段 0 和阶段 1，然后读取目标 state 的无 secrets `package/version`。同为 `1.0.2` 时不重复；旧版本按阶段 3 的更新流程执行。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming 和本地修改保护结果。
+用户直接提出更新时，仍执行阶段 0 和阶段 1，然后读取目标 state 的无 secrets `package/version`。同为 `1.0.3` 时不重复；旧版本按阶段 3 的更新流程执行。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming 和本地修改保护结果。
 
 ## 卸载流程
 
-卸载也使用阶段 0、阶段 1 核验过的 `v1.0.2` 仓库。确认目标 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
+卸载也使用阶段 0、阶段 1 核验过的 `v1.0.3` 仓库。确认目标 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
 
 macOS / Linux：
 

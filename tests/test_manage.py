@@ -308,8 +308,8 @@ class ManageTests(unittest.TestCase):
     def test_release_version_and_changelog_are_1_0_2(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
         changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
-        self.assertEqual(plugin["version"], "1.0.2")
-        self.assertIn("## [1.0.2]", changelog)
+        self.assertEqual(plugin["version"], "1.0.3")
+        self.assertIn("## [1.0.3]", changelog)
         self.assertIn("17 个 `agents/*.md` 岗位定义与契约未改动", changelog)
 
     def test_readme_first_screen_has_beginner_prerequisites(self):
@@ -336,7 +336,7 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v1.0.2",
+            "tag=v1.0.3",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "脱敏 JSON",
@@ -363,7 +363,7 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：选择 install 或 update",
             "## 阶段 4：完成报告",
-            "--branch v1.0.2 --single-branch --depth 1",
+            "--branch v1.0.3 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
             "同版本不重复",
             "严禁直接 Read/cat ZCode config",
