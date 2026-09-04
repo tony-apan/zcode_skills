@@ -2,6 +2,13 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [1.0.1] — 2026-09-04
+
+### 修正
+- 线上仓库名改为 `tony-apan/zcode_skills`，公开 URL 与 macOS/Windows clone 命令去掉 `010` 前缀
+- Ubuntu、macOS、Windows 三平台 GitHub Actions 全部通过；Windows 上已实际完成 Python 3.9 全套测试与 PowerShell 安装器 dry-run
+- README 默认安装 tag 更新为 `v1.0.1`，兼容性状态改为有证据的实际结论
+
 ## [1.0.0] — 2026-09-04
 
 首个可发布版本，包含 17 个智能体和可审计的安装生命周期。

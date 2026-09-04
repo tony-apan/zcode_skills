@@ -10,7 +10,7 @@
 |---|---|---|
 | ZCode 3.10.2 | 已验证 | 最低支持版本；不声明其他客户端兼容性 |
 | macOS | 本机实际验证 | Python 安装器、agent 配置和 shell wrapper 已在本机验证 |
-| Windows | 设计兼容，待首次 CI 证明 | Python 核心安装器支持 Windows，提供 PowerShell wrapper；CI 配置覆盖 Windows，发布 tag 前以 GitHub Actions 结果为准 |
+| Windows | GitHub Actions 已验证 | Python 核心安装器、27 项测试和 PowerShell 安装器 dry-run 已在 `windows-latest` + Python 3.9 通过 |
 | Linux | 脚本与 CI 兼容 | Python 测试和 CI 可运行；不声明 ZCode 桌面客户端已验证 |
 
 运行要求：Python >= 3.9。Windows wrapper 要求 PowerShell 5.1+。安装和无冲突更新不依赖 Git；只有三方合并本地修改、处理更新冲突以及获取版本时需要 Git。更新遇到本地修改且 Git 不可用时，安装器保留原文件并生成 `*.tony-agents-pack.incoming`。
@@ -30,7 +30,7 @@
 macOS / Linux（sh）：
 
 ```sh
-git clone --branch v1.0.0 --depth 1 https://github.com/tony-apan/zcode_skills.git
+git clone --branch v1.0.1 --depth 1 https://github.com/tony-apan/zcode_skills.git
 cd zcode_skills
 python3 scripts/manage.py validate
 ./scripts/install.sh --dry-run
@@ -40,7 +40,7 @@ python3 scripts/manage.py validate
 Windows（PowerShell 5.1+）：
 
 ```powershell
-git clone --branch v1.0.0 --depth 1 https://github.com/tony-apan/zcode_skills.git
+git clone --branch v1.0.1 --depth 1 https://github.com/tony-apan/zcode_skills.git
 Set-Location zcode_skills
 py -3 scripts/manage.py validate
 ./scripts/install.ps1 --dry-run
@@ -246,7 +246,7 @@ py -3 scripts/manage.py uninstall
 
 ## 发布者流程
 
-首次发布前，三平台 CI 只能表述为“配置覆盖”；必须以首次 push 后 GitHub Actions 的实际结果为发布依据。
+本仓库的 Ubuntu、macOS、Windows 三平台 CI 已在 `v1.0.0` 首次发布时全部通过；后续每个 tag 仍须以对应 GitHub Actions 结果为发布依据。
 
 macOS / Linux 发布者可运行 `./scripts/release.sh`。Windows 发布者在提交全部发布改动后使用：
 
