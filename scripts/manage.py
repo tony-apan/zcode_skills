@@ -10,9 +10,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 from typing import Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +31,23 @@ COMMON_ACCEPTANCE_MARKER = "report-id / role / requirement-version / snapshot(co
 ACCEPTANCE_AGENTS = {"shencha", "shencha-content", "shencha-ui", "verifier", "shencha-final"}
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$")
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+MIN_SCREENSHOT_BYTES = 10 * 1024
+MAX_PNG_CHUNK_BYTES = 64 * 1024 * 1024
+MODEL_SCREENSHOTS = (
+    "docs/images/zcode-model-glm.png",
+    "docs/images/zcode-model-deepseek.png",
+    "docs/images/zcode-model-kimi.png",
+    "docs/images/zcode-model-google.png",
+)
+QR_IMAGE = "docs/images/wechat-group-qr.png"
+RELEASE_PNGS = MODEL_SCREENSHOTS + (QR_IMAGE,)
+MODEL_GUIDE_VENDORS = ("智谱", "DeepSeek", "Kimi", "阿里云百炼", "硅基流动")
+QR_URL = "https://cos.files.maozhishi.com/data/web/web-files/wx/tony-apan.png"
+PUBLIC_DOC_FORBIDDEN_TEXT = ("/Users/tony", "010_zcode_skills", "github.com/tony-apan/010")
+PUBLIC_SECRET_RE = re.compile(
+    r"(?i)(?:\bsk-[A-Za-z0-9_-]{12,}\b|\bAIza[A-Za-z0-9_-]{20,}\b|\bBearer\s+[A-Za-z0-9._~+/-]{12,})"
+)
 
 
 class PackError(Exception):
@@ -71,6 +90,64 @@ def sha256_bytes(data: bytes) -> str:
 
 def sha256_file(path: Path) -> str:
     return sha256_bytes(path.read_bytes())
+
+
+def validate_png_structure(data: bytes) -> None:
+    if not data.startswith(PNG_SIGNATURE):
+        raise PackError("does not have a valid PNG signature")
+
+    offset = len(PNG_SIGNATURE)
+    chunk_index = 0
+    saw_idat = False
+    saw_iend = False
+    while offset < len(data):
+        if len(data) - offset < 8:
+            raise PackError("has a truncated PNG chunk header")
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        if length > MAX_PNG_CHUNK_BYTES:
+            raise PackError("has an oversized PNG chunk")
+        if len(data) - offset < 12:
+            raise PackError("has a truncated PNG chunk")
+        chunk_end = offset + 12 + length
+        if chunk_end > len(data):
+            raise PackError("has a PNG chunk length beyond the file boundary")
+
+        chunk_type = data[offset + 4 : offset + 8]
+        if not re.fullmatch(b"[A-Za-z]{4}", chunk_type):
+            raise PackError("has a PNG chunk type that is not four ASCII letters")
+        chunk_data = data[offset + 8 : offset + 8 + length]
+        expected_crc = struct.unpack(">I", data[offset + 8 + length : chunk_end])[0]
+        actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+        if actual_crc != expected_crc:
+            raise PackError("has a PNG chunk with an invalid CRC")
+
+        if chunk_index == 0:
+            if chunk_type != b"IHDR" or length != 13:
+                raise PackError("must start with a 13-byte IHDR chunk")
+            width, height = struct.unpack(">II", chunk_data[:8])
+            if width == 0 or height == 0:
+                raise PackError("has zero PNG width or height")
+        elif chunk_type == b"IHDR":
+            raise PackError("has an IHDR chunk after the first chunk")
+
+        if chunk_type == b"IDAT":
+            saw_idat = True
+        if chunk_type == b"IEND":
+            if length != 0:
+                raise PackError("has a non-empty IEND chunk")
+            saw_iend = True
+            offset = chunk_end
+            if offset != len(data):
+                raise PackError("has trailing data after IEND")
+            break
+
+        offset = chunk_end
+        chunk_index += 1
+
+    if not saw_idat:
+        raise PackError("does not contain an IDAT chunk")
+    if not saw_iend:
+        raise PackError("does not contain an IEND chunk")
 
 
 def now_iso() -> str:
@@ -281,6 +358,7 @@ def validate_package(verbose: bool = True) -> bool:
         ".github/workflows/validate.yml",
         "LICENSE",
         "README.md",
+        "MODEL_SETUP.md",
         "INSTALL-FOR-AI.md",
         "CHANGELOG.md",
         "scripts/manage.py",
@@ -295,6 +373,7 @@ def validate_package(verbose: bool = True) -> bool:
         "tests/test_manage.py",
         "tests/test_model_inventory.py",
         "tests/test_release_gate.py",
+        *RELEASE_PNGS,
     )
     for relative in required_files:
         if not (ROOT / relative).is_file():
@@ -392,26 +471,78 @@ def validate_package(verbose: bool = True) -> bool:
             errors.append("workflow checkout must fetch full history and tags with fetch-depth: 0")
         if re.search(r"uses:\s+actions/[^@\s]+@v\d+\b", workflow):
             errors.append("workflow contains a floating official action major tag")
+        if "find agents scripts tests .githooks release-audits docs" not in workflow:
+            errors.append("workflow checksum generation must include the docs directory")
+        if "MODEL_SETUP.md" not in workflow:
+            errors.append("workflow checksum generation must include MODEL_SETUP.md")
     except (OSError, UnicodeError) as exc:
         errors.append("cannot validate workflow action pins: {}".format(exc))
-    for filename in ("README.md", "INSTALL-FOR-AI.md"):
+    for relative in RELEASE_PNGS:
+        path = ROOT / relative
+        if not path.is_file():
+            continue
+        try:
+            data = path.read_bytes()
+            try:
+                validate_png_structure(data)
+            except PackError as exc:
+                errors.append("{} {}".format(relative, exc))
+            if len(data) <= MIN_SCREENSHOT_BYTES:
+                errors.append("{} must be larger than 10 KiB".format(relative))
+        except OSError as exc:
+            errors.append("cannot read {}: {}".format(relative, exc))
+    for filename in ("README.md", "INSTALL-FOR-AI.md", "MODEL_SETUP.md"):
         try:
             text = (ROOT / filename).read_text(encoding="utf-8")
-            if "ZCode 专用" not in text and "ZCode-only" not in text:
+            if filename != "MODEL_SETUP.md" and "ZCode 专用" not in text and "ZCode-only" not in text:
                 errors.append("{} must identify the package as ZCode 专用 or ZCode-only".format(filename))
-            for forbidden in ("/Users/tony", "<OWNER>"):
+            for forbidden in PUBLIC_DOC_FORBIDDEN_TEXT + ("<OWNER>",):
                 if forbidden in text:
                     errors.append("{} contains forbidden text {}".format(filename, forbidden))
+            if PUBLIC_SECRET_RE.search(text):
+                errors.append("{} appears to contain a secret value".format(filename))
             direct_read_patterns = (
                 r"(?im)^\s*(?:cat|less|more|head|tail)\s+[^\n]*config\.json",
                 r"(?im)^\s*(?:请|让 AI|AI 应|AI 先|使用 Read|用 Read)[^\n]*(?:读取|读|Read|cat)[^\n]*config\.json",
             )
             if any(re.search(pattern, text) for pattern in direct_read_patterns):
                 errors.append("{} instructs AI to read config.json directly".format(filename))
-            if "scripts/model_inventory.py" not in text or "model-inventory" not in text:
+            if filename != "MODEL_SETUP.md" and ("scripts/model_inventory.py" not in text or "model-inventory" not in text):
                 errors.append("{} does not document the sanitized model inventory helper".format(filename))
         except (OSError, UnicodeError) as exc:
             errors.append("cannot read {}: {}".format(filename, exc))
+    try:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for marker in (
+            'src="{}"'.format(QR_IMAGE),
+            'href="{}"'.format(QR_IMAGE),
+            QR_URL,
+            'width="50%"',
+            'alt="扫码入群"',
+            "仓库内图片固定随版本审计",
+            "MODEL_SETUP.md",
+        ):
+            if marker not in readme:
+                errors.append("README.md is missing required community/model-guide marker: {}".format(marker))
+    except (OSError, UnicodeError) as exc:
+        errors.append("cannot validate README.md community/model-guide markers: {}".format(exc))
+    try:
+        guide = (ROOT / "MODEL_SETUP.md").read_text(encoding="utf-8")
+        for vendor in MODEL_GUIDE_VENDORS:
+            if vendor not in guide:
+                errors.append("MODEL_SETUP.md is missing vendor keyword: {}".format(vendor))
+        if not re.search(r"API Key[^\n]*(?:禁止|不要|不得)|(?:禁止|不要|不得)[^\n]*API Key", guide, re.IGNORECASE):
+            errors.append("MODEL_SETUP.md is missing an API Key safety warning")
+        if not re.search(r"核验日期[^\n]*\d{4}-\d{2}-\d{2}", guide):
+            errors.append("MODEL_SETUP.md is missing a dated verification marker")
+        if "http://" in guide:
+            errors.append("MODEL_SETUP.md contains a non-HTTPS URL")
+        for relative in MODEL_SCREENSHOTS:
+            alt_pattern = r"!\[([^\]]*[\u4e00-\u9fff][^\]]*)\]\({}\)".format(re.escape(relative))
+            if not re.search(alt_pattern, guide):
+                errors.append("MODEL_SETUP.md must reference {} with Chinese alt text".format(relative))
+    except (OSError, UnicodeError) as exc:
+        errors.append("cannot validate MODEL_SETUP.md content: {}".format(exc))
     if errors:
         print("VALIDATION FAILED ({} error(s))".format(len(errors)), file=sys.stderr)
         for error in errors:
