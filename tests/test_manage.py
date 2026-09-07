@@ -395,7 +395,7 @@ class ManageTests(unittest.TestCase):
         first_screen = "\n".join(readme.splitlines()[:60])
         for marker in (
             "# ZCode 专用",
-            "安全安装 17 个智能体",
+            "安全安装 18 个智能体",
             "必须先安装 ZCode",
             "不是独立软件",
             "不能直接在 ChatGPT 或 Claude 网页中使用",
@@ -415,11 +415,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v1.0.5",
+            "tag=v1.1.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 1.0.5",
+            "同为 1.1.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -447,9 +447,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v1.0.5 --single-branch --depth 1",
+            "--branch v1.1.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `1.0.5`",
+            "同为 `1.1.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
