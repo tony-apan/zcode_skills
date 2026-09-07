@@ -288,8 +288,13 @@ def validate_package(verbose: bool = True) -> bool:
         "scripts/install.sh",
         "scripts/install.ps1",
         "scripts/release.sh",
+        "scripts/release_gate.py",
+        "scripts/setup-hooks.sh",
+        ".githooks/pre-push",
+        "release-audits/README.md",
         "tests/test_manage.py",
         "tests/test_model_inventory.py",
+        "tests/test_release_gate.py",
     )
     for relative in required_files:
         if not (ROOT / relative).is_file():
@@ -315,6 +320,37 @@ def validate_package(verbose: bool = True) -> bool:
                     raise PackError("github tools must be strictly read-only")
                 if not forbidden_tools.issubset(set(metadata.get("disallowedTools", []))):
                     raise PackError("github disallowedTools must include Bash, Write, and Edit")
+                for marker in (
+                    "REPO_REVIEW",
+                    "README_POLISH",
+                    "RELEASE_GATE",
+                    "RELEASE_NOTES",
+                    "target_version",
+                    "package_fingerprint",
+                    "base_ref",
+                    "target_ref",
+                    "changed_files",
+                    "removed_files",
+                    "changed_agents",
+                    "reviewer: github",
+                    "| evidence-id | check | result | evidence |",
+                    "| finding-id | severity | status | summary |",
+                    "| improvement-id | user-value | evidence-ref |",
+                    "| owner | action | status |",
+                    "breaking_impact",
+                    "## Scope",
+                    "## Evidence",
+                    "## Findings",
+                    "## Agent Links",
+                    "## Improvements",
+                    "## Blockers",
+                    "## Unverified",
+                    "## Migration",
+                    "## Hand-off",
+                    "blob/v<target_version>",
+                ):
+                    if marker not in text:
+                        raise PackError("missing github release-gate marker: {}".format(marker))
             role_markers = {
                 "frontend": ("## 模式", "可访问性", "截图"),
                 "mermaid": ("永远只输出一个 `mermaid` 代码块", "`graph TD`", "`click`", "集合"),
@@ -346,6 +382,18 @@ def validate_package(verbose: bool = True) -> bool:
             errors.append("CHANGELOG.md does not contain version {}".format(version))
     except (OSError, UnicodeError, PackError) as exc:
         errors.append("plugin/changelog validation failed: {}".format(exc))
+    try:
+        workflow = (ROOT / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+        for action, major in (("checkout", "v4"), ("setup-python", "v5"), ("upload-artifact", "v4")):
+            pattern = r"actions/{}@[0-9a-f]{{40}}\s+#\s*{}\b".format(re.escape(action), major)
+            if not re.search(pattern, workflow):
+                errors.append("workflow action {} must use a full commit SHA with # {}".format(action, major))
+        if "fetch-depth: 0" not in workflow:
+            errors.append("workflow checkout must fetch full history and tags with fetch-depth: 0")
+        if re.search(r"uses:\s+actions/[^@\s]+@v\d+\b", workflow):
+            errors.append("workflow contains a floating official action major tag")
+    except (OSError, UnicodeError) as exc:
+        errors.append("cannot validate workflow action pins: {}".format(exc))
     for filename in ("README.md", "INSTALL-FOR-AI.md"):
         try:
             text = (ROOT / filename).read_text(encoding="utf-8")

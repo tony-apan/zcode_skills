@@ -27,6 +27,8 @@ class ManageTests(unittest.TestCase):
         shutil.copytree(ROOT / "scripts", self.package / "scripts", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         shutil.copytree(ROOT / "tests", self.package / "tests", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         shutil.copytree(ROOT / ".zcode-plugin", self.package / ".zcode-plugin")
+        shutil.copytree(ROOT / ".githooks", self.package / ".githooks")
+        shutil.copytree(ROOT / "release-audits", self.package / "release-audits")
         workflow_dir = self.package / ".github" / "workflows"
         workflow_dir.mkdir(parents=True)
         shutil.copy2(ROOT / ".github" / "workflows" / "validate.yml", workflow_dir / "validate.yml")
@@ -377,10 +379,13 @@ class ManageTests(unittest.TestCase):
             self.assertRegex(text, manage.INJECTION_DEFENSE_RE, path.name)
 
     def test_github_metadata_is_hard_read_only(self):
-        metadata = manage.parse_frontmatter((self.package / "agents" / "github.md").read_text(encoding="utf-8"))
+        text = (self.package / "agents" / "github.md").read_text(encoding="utf-8")
+        metadata = manage.parse_frontmatter(text)
         forbidden = {"Bash", "Write", "Edit"}
         self.assertTrue(forbidden.isdisjoint(metadata["tools"]))
         self.assertTrue(forbidden.issubset(set(metadata["disallowedTools"])))
+        for marker in ("REPO_REVIEW", "README_POLISH", "RELEASE_GATE", "RELEASE_NOTES", "package_fingerprint"):
+            self.assertIn(marker, text)
 
     def test_frontend_has_no_skills_metadata(self):
         metadata = manage.parse_frontmatter((self.package / "agents" / "frontend.md").read_text(encoding="utf-8"))
@@ -447,6 +452,7 @@ class ManageTests(unittest.TestCase):
         self.assertEqual(plugin["version"], changelog_match.group(1))
         self.assertEqual(plugin["version"], prompt_match.group(1))
         self.assertIn("20 岗逐个完成红队强化", changelog)
+        self.assertIn("每次维护者 push", changelog)
 
     def test_readme_first_screen_has_beginner_prerequisites(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
@@ -474,11 +480,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v2.0.0",
+            "tag=v3.0.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 2.0.0",
+            "同为 3.0.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -508,9 +514,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v2.0.0 --single-branch --depth 1",
+            "--branch v3.0.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `2.0.0`",
+            "同为 `3.0.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
@@ -531,10 +537,28 @@ class ManageTests(unittest.TestCase):
         workflow = (self.package / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
         for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
             self.assertIn(runner, workflow)
-        self.assertIn("actions/setup-python@v5", workflow)
+        pins = {
+            "checkout": "11d5960a326750d5838078e36cf38b85af677262 # v4",
+            "setup-python": "a26af69be951a213d495a4c3e4e4022e16d87065 # v5",
+            "upload-artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02 # v4",
+        }
+        for action, pin in pins.items():
+            self.assertIn("actions/{}@{}".format(action, pin), workflow)
+        self.assertIn("actions/checkout@{}\n        with:\n          fetch-depth: 0".format(pins["checkout"]), workflow)
+        self.assertIsNone(re.search(r"uses:\s+actions/[^@]+@v\d+\b", workflow))
+        self.assertIn("permissions:\n  contents: read", workflow)
+        self.assertIn('release_gate.py check --commit "${{ github.sha }}"', workflow)
         self.assertIn("$Target = Join-Path $env:RUNNER_TEMP 'tony-agents-dry-run'", workflow)
         self.assertIn("scripts/install.ps1 --dry-run --target-dir $Target", workflow)
         self.assertIn('./scripts/install.sh --dry-run --target-dir "$RUNNER_TEMP/tony-agents-sh"', workflow)
+
+    def test_release_and_pre_push_scripts_enforce_gate(self):
+        release = (self.package / "scripts" / "release.sh").read_text(encoding="utf-8")
+        hook = (self.package / ".githooks" / "pre-push").read_text(encoding="utf-8")
+        self.assertIn('release_gate.py" check', release)
+        self.assertIn('release_gate.py" check --root "$ROOT" --commit "$HEAD_SHA"', hook)
+        self.assertIn("unittest discover", hook)
+        self.assertIn('local_sha" = "$ZERO', hook)
 
     def test_update_model_map_overrides_model_and_removes_old_thought_level(self):
         initial_map = self.temp / "initial-model-map.json"

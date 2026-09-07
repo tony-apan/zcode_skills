@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ZERO=0000000000000000000000000000000000000000
+HEAD_SHA=$(git -C "$ROOT" rev-parse HEAD)
+CHECK_HEAD=0
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ -z "${local_ref-}" ]; then
+    continue
+  fi
+  if [ "$local_sha" = "$ZERO" ]; then
+    printf '%s\n' "release gate: skipping deleted ref $remote_ref"
+    continue
+  fi
+  commit_sha=$(git -C "$ROOT" rev-parse "${local_ref}^{commit}") || {
+    printf '%s\n' "release gate: cannot resolve $local_ref to a commit" >&2
+    exit 1
+  }
+  if [ "$commit_sha" != "$HEAD_SHA" ]; then
+    printf '%s\n' "release gate: refusing non-HEAD push $local_ref ($commit_sha); checkout that commit and obtain a RELEASE_GATE review" >&2
+    exit 1
+  fi
+  CHECK_HEAD=1
+done
+
+if [ "$CHECK_HEAD" -eq 0 ]; then
+  exit 0
+fi
+
+python3 "$ROOT/scripts/manage.py" validate
+(
+  cd "$ROOT"
+  python3 -m unittest discover -s tests -p 'test_*.py' -v
+)
+python3 "$ROOT/scripts/release_gate.py" check --root "$ROOT" --commit "$HEAD_SHA"

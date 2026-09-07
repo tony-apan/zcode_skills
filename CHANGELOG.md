@@ -2,6 +2,26 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [3.0.0] — 2026-09-07
+
+### Breaking changes
+- `github` 智能体的 `RELEASE_GATE` 必填输入/输出契约升级：审计新增 `changed_files`、`changed_agents`、`breaking_impact`，并对 Scope、Evidence、Findings、Agent Links、Improvements、Migration 与 Hand-off 做语义校验。
+- 维护者 push 流程改为强制安装 hook 并为每次发布 payload 获取新 PASS 审计；旧格式审计不能复用。普通用户的 agent 安装/update 仍兼容，安装 state schema 不变。
+
+### 新增
+- 每次维护者 push、PR 和 tag 都必须具有 `github` 智能体 `MODE=RELEASE_GATE` 的真实 PASS 审计；pre-push hook、三平台 CI 与 `release.sh` 共同执行硬门禁，普通安装用户不受影响。
+- 新增确定性 package fingerprint。Git 仓库中只纳入 tracked 与非 ignored untracked 发布路径；仅版本审计报告 `release-audits/v*.md`、Python cache、根目录 checksum 和明确安装运行产物排除，audit README 等治理文件参与。每项同时哈希路径、类型、内容或 symlink target 以及 executable bit。
+- `github` 新增 `REPO_REVIEW`、`README_POLISH`、`RELEASE_GATE`、`RELEASE_NOTES` 四种模式，保持无 Bash/Write/Edit 的硬只读边界。
+- GitHub Actions 的 checkout、Python setup 和 artifact upload 全部固定到由 GitHub refs API 解析的官方完整 commit SHA，同时保持最小 `contents: read` 权限。
+
+### 用户价值
+- 发布前自动阻止测试失败、版本漂移、敏感信息、缺失智能体链接或缺少改进说明的版本进入 GitHub，用户看到的每个版本都能追溯到固定源码快照和审查报告。
+- 发布交付统一包含版本、智能体链接、用户价值改进、兼容影响、验证结果与审计链接；README 提供无需改变量的完整 ZCode 审查提示词和渐进式优化路线图。
+
+### 兼容性与迁移
+- 普通用户向后兼容 `v2.0.0` 的 20 个 agent 安装、更新、回滚和卸载路径，按 README 更新到 v3 即可，安装 state schema 不变。
+- 维护者必须运行 `./scripts/setup-hooks.sh`，并按 v3 schema 生成每次 push 对应的真实审计；旧审计会被 gate 拒绝。
+
 ## [2.0.0] — 2026-09-07
 
 ### Breaking changes

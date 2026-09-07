@@ -23,6 +23,7 @@ python3 "$SCRIPT_DIR/manage.py" validate
   cd "$ROOT"
   python3 -m unittest discover -s tests -p 'test_*.py' -v
 )
+python3 "$SCRIPT_DIR/release_gate.py" check --root "$ROOT"
 grep -Eq "^## \[$VERSION\]" "$ROOT/CHANGELOG.md" || {
   printf '%s\n' "CHANGELOG.md does not contain $VERSION" >&2
   exit 1
