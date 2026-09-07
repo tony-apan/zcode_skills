@@ -394,7 +394,8 @@ class ManageTests(unittest.TestCase):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
         first_screen = "\n".join(readme.splitlines()[:60])
         for marker in (
-            "# ZCode 专用",
+            "ZCode 专用",
+            "外贸 AI 员工团",
             "安全安装整套智能体",
             "必须先安装 ZCode",
             "不是独立软件",
