@@ -35,7 +35,8 @@ class ReleaseGateTests(unittest.TestCase):
         self.git("commit", "-qm", "base fixture")
         self.git("tag", "v2.0.0")
         self.write("agents/github.md", "v3 contract\n")
-        self.write("new.txt", "untracked release file\n")
+        self.write("new.txt", "staged release file\n")
+        self.git("add", "new.txt")
         (self.root / "removed.txt").unlink()
 
     def write(self, relative, content):
@@ -139,11 +140,35 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertNotIn(".env.untracked", changed)
         self.assertNotIn("debug.log", changed)
 
-    def test_executable_bit_changes_fingerprint(self):
+    def test_check_rejects_nonignored_untracked_release_file(self):
+        self.write("unstaged.txt", "must be staged\n")
+        self.write_audit({"package_fingerprint": release_gate.package_fingerprint(self.root)})
+        with self.assertRaisesRegex(release_gate.GateError, "stage release files before audit: unstaged.txt"):
+            release_gate.check_gate(self.root, None, None)
+
+    def test_old_audit_fingerprint_cannot_pass(self):
+        self.write_audit({"package_fingerprint": "0" * 64})
+        with self.assertRaisesRegex(release_gate.GateError, "package_fingerprint"):
+            release_gate.check_gate(self.root, None, None)
+
+    def test_executable_bit_changes_fingerprint_from_git_index(self):
         path = self.write("script.sh", "#!/bin/sh\nexit 0\n")
+        self.git("add", "script.sh")
+        self.git("update-index", "--chmod=-x", "script.sh")
         before = release_gate.package_fingerprint(self.root)
-        path.chmod(path.stat().st_mode | stat_exec())
-        self.assertNotEqual(before, release_gate.package_fingerprint(self.root))
+        self.git("update-index", "--chmod=+x", "script.sh")
+        after = release_gate.package_fingerprint(self.root)
+        self.assertNotEqual(before, after)
+        self.assertEqual(release_gate.tracked_mode_map(self.root)["script.sh"], "100755")
+
+    def test_tracked_git_mode_ignores_windows_style_filesystem_mode(self):
+        path = self.write("script.sh", "#!/bin/sh\nexit 0\n")
+        self.git("add", "script.sh")
+        self.git("update-index", "--chmod=+x", "script.sh")
+        expected = release_gate.package_fingerprint(self.root)
+        path.chmod(0o644)
+        self.assertEqual(release_gate.tracked_mode_map(self.root)["script.sh"], "100755")
+        self.assertEqual(expected, release_gate.package_fingerprint(self.root))
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unsupported")
     def test_symlink_target_and_executable_marker_are_hashed_without_following(self):
@@ -300,10 +325,6 @@ class ReleaseGateTests(unittest.TestCase):
         output = release_gate.template(self.root)
         for marker in ("reviewer: github", "| evidence-id | check | result | evidence |", "| finding-id | severity | status | summary |", "| improvement-id | user-value | evidence-ref |", "breaking-impact:", "| owner | action | status |"):
             self.assertIn(marker, output)
-
-
-def stat_exec():
-    return 0o100
 
 
 if __name__ == "__main__":

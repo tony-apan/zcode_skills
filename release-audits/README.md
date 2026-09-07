@@ -6,13 +6,13 @@
 
 In a Git repository, the payload is the union of `git ls-files` tracked paths and `git ls-files --others --exclude-standard` non-ignored untracked paths. Explicit exclusions are version audit reports, `__pycache__`, `*.pyc`, root `SHA256SUMS`, and `.tony-agents-pack` runtime artifacts. A tracked `.env` or log remains in the payload and is separately subject to secret review; an ignored, untracked local `.env` or log is not a release path and therefore does not affect the fingerprint or diff. Outside a Git repository, fingerprint tests fall back to filesystem traversal with the same explicit exclusions.
 
-Each fingerprint entry includes its relative path, file/symlink type, content or link-target hash, and whether any executable bit is set. Symlinks are not followed.
+Each fingerprint entry includes its relative path, file/symlink type, content or link-target hash, and executable marker. Tracked type and executable state come from the Git index/tree mode (`100644`, `100755`, or `120000`), with current Git worktree mode changes overlaid, so Windows and POSIX clones compute the same marker. Symlinks are not followed. Untracked entries can be fingerprinted for diagnostics, but must be staged before a PASS audit can be checked.
 
 ## Required flow
 
-1. Run `python3 scripts/release_gate.py fingerprint` and collect the release diff, changed files, removed files, changed agents, breaking impact, and validation/test results.
+1. Stage the release payload with `git add -A`, then run `python3 scripts/release_gate.py fingerprint` and collect the staged/worktree diff, changed files, removed files, changed agents, breaking impact, and validation/test results. The gate refuses PASS while any non-ignored release file remains untracked.
 2. Explicitly invoke the `github` agent with `MODE=RELEASE_GATE` and all required input fields. The agent remains hard read-only and returns report content only. The lists must come from the real Git payload diff, not a transcription of unverified input.
-3. The main AI writes that exact reviewed report to `release-audits/v<VERSION>.md`.
+3. The main AI writes that exact reviewed report to `release-audits/v<VERSION>.md`, then stages that audit report separately with `git add release-audits/v<VERSION>.md`.
 4. Run `python3 scripts/release_gate.py check`. The gate independently recomputes the real Git diff from `base_ref` to the current worktree or target commit, including tracked changes, deletions, both sides of renames, and non-ignored untracked files. It requires exact set equality. Fix any failure, recompute the fingerprint, and request a new review.
 5. Commit the reviewed release source and its audit. The pre-push hook accepts `target_ref: WORKTREE:<fingerprint>` because version audit reports do not affect the fingerprint.
 

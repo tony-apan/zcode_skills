@@ -118,6 +118,74 @@ def nul_paths(data: bytes) -> List[str]:
     return [item for item in data.decode("utf-8", "surrogateescape").split("\0") if item]
 
 
+def parse_raw_modes(data: bytes) -> List[Tuple[str, str, str, str]]:
+    fields = nul_paths(data)
+    records: List[Tuple[str, str, str, str]] = []
+    index = 0
+    while index < len(fields):
+        header = fields[index]
+        index += 1
+        match = re.fullmatch(r":([0-7]{6}) ([0-7]{6}) [0-9a-f]+ [0-9a-f]+ ([A-Z][0-9]*)", header)
+        if not match:
+            raise GateError("cannot parse git diff --raw record: {!r}".format(header))
+        old_mode, new_mode, status_value = match.groups()
+        if status_value.startswith(("R", "C")):
+            if index + 1 >= len(fields):
+                raise GateError("git diff --raw ended inside a rename/copy record")
+            _source, target = fields[index], fields[index + 1]
+            index += 2
+            records.append((target, old_mode, new_mode, status_value))
+        else:
+            if index >= len(fields):
+                raise GateError("git diff --raw ended without a path")
+            path = fields[index]
+            index += 1
+            records.append((path, old_mode, new_mode, status_value))
+    return records
+
+
+def tracked_mode_map(root: Path) -> Dict[str, str]:
+    """Return Git index modes with unstaged mode changes overlaid safely."""
+    result: Dict[str, str] = {}
+    for record in nul_paths(git_output(root, ["ls-files", "--stage", "-z"])):
+        match = re.fullmatch(r"([0-7]{6}) [0-9a-f]+ [0-3]\t(.+)", record)
+        if not match:
+            raise GateError("cannot parse git ls-files --stage record: {!r}".format(record))
+        mode, path = match.groups()
+        result[path] = mode
+
+    staged_mode_paths = {
+        path
+        for path, old_mode, new_mode, _status in parse_raw_modes(
+            git_output(root, ["diff", "--cached", "--raw", "-z", "--find-renames", "HEAD"])
+        )
+        if old_mode != new_mode
+    }
+    for path, old_mode, new_mode, _status in parse_raw_modes(
+        git_output(root, ["diff", "--raw", "-z", "--find-renames"])
+    ):
+        if path in staged_mode_paths or old_mode == new_mode:
+            continue
+        if new_mode == "000000":
+            result.pop(path, None)
+        else:
+            result[path] = new_mode
+    return result
+
+
+def untracked_payload_paths(root: Path) -> List[Path]:
+    if not is_git_repository(root):
+        return []
+    return sorted(
+        (
+            Path(value)
+            for value in nul_paths(git_output(root, ["ls-files", "--others", "--exclude-standard", "-z"]))
+            if not excluded(Path(value))
+        ),
+        key=lambda item: item.as_posix(),
+    )
+
+
 def fallback_payload_paths(root: Path) -> List[Path]:
     files: List[Path] = []
     try:
@@ -150,7 +218,7 @@ def payload_paths(root: Path) -> List[Path]:
     if not is_git_repository(root):
         return fallback_payload_paths(root)
     tracked = nul_paths(git_output(root, ["ls-files", "-z"]))
-    untracked = nul_paths(git_output(root, ["ls-files", "--others", "--exclude-standard", "-z"]))
+    untracked = [path.as_posix() for path in untracked_payload_paths(root)]
     result = []
     for value in set(tracked) | set(untracked):
         relative = Path(value)
@@ -167,19 +235,32 @@ def payload_paths(root: Path) -> List[Path]:
 
 def package_fingerprint(root: Path) -> str:
     root = root.resolve()
+    git_modes = tracked_mode_map(root) if is_git_repository(root) else {}
     digest = hashlib.sha256()
     for relative in payload_paths(root):
         path = root / relative
-        mode = path.lstat().st_mode
-        executable = b"1" if mode & 0o111 else b"0"
-        if stat.S_ISLNK(mode):
-            payload = os.readlink(str(path)).encode("utf-8", "surrogateescape")
-            entry_type = b"symlink"
-        elif stat.S_ISREG(mode):
-            payload = path.read_bytes()
-            entry_type = b"file"
+        git_mode = git_modes.get(relative.as_posix())
+        if git_mode is not None:
+            executable = b"1" if git_mode == "100755" else b"0"
+            if git_mode == "120000":
+                payload = os.readlink(str(path)).encode("utf-8", "surrogateescape")
+                entry_type = b"symlink"
+            elif git_mode in {"100644", "100755"}:
+                payload = path.read_bytes()
+                entry_type = b"file"
+            else:
+                raise GateError("unsupported tracked Git mode {} for {}".format(git_mode, relative.as_posix()))
         else:
-            raise GateError("unsupported release payload entry type: {}".format(relative.as_posix()))
+            mode = path.lstat().st_mode
+            executable = b"1" if mode & 0o111 else b"0"
+            if stat.S_ISLNK(mode):
+                payload = os.readlink(str(path)).encode("utf-8", "surrogateescape")
+                entry_type = b"symlink"
+            elif stat.S_ISREG(mode):
+                payload = path.read_bytes()
+                entry_type = b"file"
+            else:
+                raise GateError("unsupported release payload entry type: {}".format(relative.as_posix()))
         digest.update(relative.as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(entry_type)
@@ -526,6 +607,11 @@ def check_gate(root: Path, requested_version: Optional[str], commit: Optional[st
     audit_path = root / "release-audits" / ("v" + version + ".md")
     if not audit_path.is_file():
         raise GateError("PASS audit is missing: {}".format(audit_path))
+    untracked = untracked_payload_paths(root)
+    if untracked:
+        raise GateError(
+            "stage release files before audit: {}".format(", ".join(path.as_posix() for path in untracked))
+        )
     try:
         metadata, body = parse_audit(audit_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError) as exc:
