@@ -36,8 +36,8 @@ class ReleaseGateTests(unittest.TestCase):
         self.git("tag", "v2.0.0")
         self.write("agents/github.md", "v3 contract\n")
         self.write("new.txt", "staged release file\n")
-        self.git("add", "new.txt")
         (self.root / "removed.txt").unlink()
+        self.git("add", "-A")
 
     def write(self, relative, content):
         path = self.root / relative
@@ -111,6 +111,8 @@ class ReleaseGateTests(unittest.TestCase):
     def test_audit_readme_changes_fingerprint_and_enters_diff(self):
         before = release_gate.package_fingerprint(self.root)
         self.write("release-audits/README.md", "governance changed\n")
+        self.assertEqual(before, release_gate.package_fingerprint(self.root))
+        self.git("add", "release-audits/README.md")
         after = release_gate.package_fingerprint(self.root)
         self.assertNotEqual(before, after)
         changed, _ = release_gate.release_diff(self.root, "v2.0.0", "WORKTREE:" + after, None)
@@ -129,6 +131,7 @@ class ReleaseGateTests(unittest.TestCase):
         before = release_gate.package_fingerprint(self.root)
         self.write(".env.tracked", "changed\n")
         self.write("tracked.log", "changed\n")
+        self.git("add", "-f", ".env.tracked", "tracked.log")
         tracked = release_gate.package_fingerprint(self.root)
         self.assertNotEqual(before, tracked)
         self.write(".env.untracked", "ignored\n")
@@ -151,6 +154,20 @@ class ReleaseGateTests(unittest.TestCase):
         with self.assertRaisesRegex(release_gate.GateError, "package_fingerprint"):
             release_gate.check_gate(self.root, None, None)
 
+    def test_staged_blob_change_changes_fingerprint(self):
+        before = release_gate.package_fingerprint(self.root)
+        self.write("agents/github.md", "new staged contract\n")
+        self.git("add", "agents/github.md")
+        self.assertNotEqual(before, release_gate.package_fingerprint(self.root))
+
+    def test_unstaged_crlf_change_does_not_change_index_fingerprint_and_check_rejects(self):
+        before = release_gate.package_fingerprint(self.root)
+        (self.root / "agents" / "github.md").write_bytes(b"v3 contract\r\n")
+        self.assertEqual(before, release_gate.package_fingerprint(self.root))
+        self.write_audit({"package_fingerprint": before})
+        with self.assertRaisesRegex(release_gate.GateError, "stage all release changes before audit: agents/github.md"):
+            release_gate.check_gate(self.root, None, None)
+
     def test_executable_bit_changes_fingerprint_from_git_index(self):
         path = self.write("script.sh", "#!/bin/sh\nexit 0\n")
         self.git("add", "script.sh")
@@ -159,7 +176,7 @@ class ReleaseGateTests(unittest.TestCase):
         self.git("update-index", "--chmod=+x", "script.sh")
         after = release_gate.package_fingerprint(self.root)
         self.assertNotEqual(before, after)
-        self.assertEqual(release_gate.tracked_mode_map(self.root)["script.sh"], "100755")
+        self.assertEqual(release_gate.index_entry_map(self.root)["script.sh"][0], "100755")
 
     def test_tracked_git_mode_ignores_windows_style_filesystem_mode(self):
         path = self.write("script.sh", "#!/bin/sh\nexit 0\n")
@@ -167,7 +184,7 @@ class ReleaseGateTests(unittest.TestCase):
         self.git("update-index", "--chmod=+x", "script.sh")
         expected = release_gate.package_fingerprint(self.root)
         path.chmod(0o644)
-        self.assertEqual(release_gate.tracked_mode_map(self.root)["script.sh"], "100755")
+        self.assertEqual(release_gate.index_entry_map(self.root)["script.sh"][0], "100755")
         self.assertEqual(expected, release_gate.package_fingerprint(self.root))
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unsupported")
@@ -177,11 +194,13 @@ class ReleaseGateTests(unittest.TestCase):
         self.addCleanup(lambda: outside.unlink() if outside.exists() else None)
         link = self.root / "link"
         link.symlink_to(outside)
+        self.git("add", "link")
         first = release_gate.package_fingerprint(self.root)
         outside.write_text("two\n", encoding="utf-8")
         self.assertEqual(first, release_gate.package_fingerprint(self.root))
         link.unlink()
         link.symlink_to("other-target")
+        self.git("add", "link")
         self.assertNotEqual(first, release_gate.package_fingerprint(self.root))
 
     def test_fallback_non_git_directory_uses_same_exclusions(self):
@@ -312,7 +331,6 @@ class ReleaseGateTests(unittest.TestCase):
             release_gate.check_gate(self.root, None, None)
 
     def test_commit_mode_and_missing_git_fail_closed(self):
-        self.git("add", "-A")
         self.git("commit", "-qm", "target")
         target = self.git("rev-parse", "HEAD")
         self.write_audit({"target_ref": target})
@@ -320,6 +338,15 @@ class ReleaseGateTests(unittest.TestCase):
         with mock.patch.object(release_gate.shutil, "which", return_value=None):
             with self.assertRaisesRegex(release_gate.GateError, "git is required"):
                 release_gate.check_gate(self.root, None, target)
+
+    def test_worktree_audit_passes_after_commit_in_clean_ci_index(self):
+        fingerprint = self.write_audit()
+        self.git("add", "release-audits/v3.0.0.md")
+        self.git("commit", "-qm", "release candidate")
+        self.assertEqual(fingerprint, release_gate.package_fingerprint(self.root))
+        self.assertFalse(release_gate.staged_payload_paths(self.root))
+        self.assertFalse(release_gate.unstaged_payload_paths(self.root))
+        self.assertIn("PASS", release_gate.check_gate(self.root, None, self.git("rev-parse", "HEAD")))
 
     def test_template_contains_structured_schema(self):
         output = release_gate.template(self.root)

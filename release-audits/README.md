@@ -6,7 +6,7 @@
 
 In a Git repository, the payload is the union of `git ls-files` tracked paths and `git ls-files --others --exclude-standard` non-ignored untracked paths. Explicit exclusions are version audit reports, `__pycache__`, `*.pyc`, root `SHA256SUMS`, and `.tony-agents-pack` runtime artifacts. A tracked `.env` or log remains in the payload and is separately subject to secret review; an ignored, untracked local `.env` or log is not a release path and therefore does not affect the fingerprint or diff. Outside a Git repository, fingerprint tests fall back to filesystem traversal with the same explicit exclusions.
 
-Each fingerprint entry includes its relative path, file/symlink type, content or link-target hash, and executable marker. Tracked type and executable state come from the Git index/tree mode (`100644`, `100755`, or `120000`), with current Git worktree mode changes overlaid, so Windows and POSIX clones compute the same marker. Symlinks are not followed. Untracked entries can be fingerprinted for diagnostics, but must be staged before a PASS audit can be checked.
+Each tracked fingerprint entry comes entirely from the Git index: relative path, index mode (`100644`, `100755`, or `120000`), blob SHA, and raw blob bytes read with `git cat-file blob`. A symlink blob contains the link target and is never followed. This makes fingerprints independent of Windows checkout CRLF conversion and filesystem executable semantics. Untracked entries can be fingerprinted for diagnostics, but PASS requires staging every release file and having no unstaged payload changes.
 
 ## Required flow
 
