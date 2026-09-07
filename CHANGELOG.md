@@ -2,6 +2,16 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [3.0.1] — 2026-09-07
+
+### 维护流程
+- 远端 `main` 保护已启用 PR-only：required checks 为 `validate (ubuntu-latest, 3.9)`、`validate (macos-latest, 3.9)`、`validate (windows-latest, 3.9)`，要求分支与 `main` 保持最新（strict），对管理员同样强制（admins enforced），并启用 linear history 与 conversation resolution；禁止 force push 和删除受保护分支。
+- required approving review count 为 `0`，避免单人仓库因必须由他人批准而自锁；所有改动仍必须通过功能分支和 PR 合并，禁止直接 push `main`。
+- README 与 INSTALL-FOR-AI 的维护者发布说明同步为 audit、gate、功能分支 commit/push、PR、required checks、合并 `main`、更新本地 `main`、再创建 release tag 的顺序。
+
+### 兼容性
+- 仅文档、版本与文档 marker 测试更新；无智能体契约变更，普通安装、更新和卸载流程不变。
+
 ## [3.0.0] — 2026-09-07
 
 ### Breaking changes
