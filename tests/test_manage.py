@@ -395,7 +395,7 @@ class ManageTests(unittest.TestCase):
         first_screen = "\n".join(readme.splitlines()[:60])
         for marker in (
             "# ZCode 专用",
-            "安全安装 18 个智能体",
+            "安全安装整套智能体",
             "必须先安装 ZCode",
             "不是独立软件",
             "不能直接在 ChatGPT 或 Claude 网页中使用",
