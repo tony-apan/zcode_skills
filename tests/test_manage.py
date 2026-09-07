@@ -416,11 +416,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v1.1.3",
+            "tag=v1.2.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 1.1.3",
+            "同为 1.2.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -433,10 +433,12 @@ class ManageTests(unittest.TestCase):
         self.assertNotIn("确认 ZCode 至少", prompt)
 
     def test_docs_have_no_legacy_repo_prefix_or_machine_paths(self):
+        legacy_repo_prefix = "010_" + "zcode_skills"
+        legacy_github_prefix = "github.com/tony-apan/" + "010"
         for filename in ("README.md", "INSTALL-FOR-AI.md"):
             text = (self.package / filename).read_text(encoding="utf-8")
-            self.assertNotIn("010_zcode_skills", text, filename)
-            self.assertNotIn("github.com/tony-apan/010", text, filename)
+            self.assertNotIn(legacy_repo_prefix, text, filename)
+            self.assertNotIn(legacy_github_prefix, text, filename)
             self.assertNotIn("/Users/", text, filename)
             self.assertNotIn("v1.0.1 --", text, filename)
 
@@ -448,9 +450,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v1.1.3 --single-branch --depth 1",
+            "--branch v1.2.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `1.1.3`",
+            "同为 `1.2.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
