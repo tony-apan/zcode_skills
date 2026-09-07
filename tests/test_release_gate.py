@@ -23,7 +23,7 @@ class ReleaseGateTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        self.write(".zcode-plugin/plugin.json", json.dumps({"version": "3.0.0"}))
+        self.write(".zcode-plugin/plugin.json", json.dumps({"version": "3.0.1"}))
         self.write(".gitignore", ".env*\n*.log\n")
         self.write("agents/github.md", "base contract\n")
         self.write("release-audits/README.md", "governance base\n")
@@ -64,7 +64,7 @@ class ReleaseGateTests(unittest.TestCase):
             "role": "github",
             "reviewer": "github",
             "mode": "RELEASE_GATE",
-            "version": "3.0.0",
+            "version": "3.0.1",
             "package_fingerprint": fingerprint,
             "base_ref": "v2.0.0",
             "target_ref": "WORKTREE:" + fingerprint,
@@ -81,7 +81,7 @@ class ReleaseGateTests(unittest.TestCase):
             "Scope": "- changed_files: `agents/github.md`, `new.txt`\n- removed_files: `removed.txt`\n- changed_agents: `github`",
             "Evidence": "| evidence-id | check | result | evidence |\n|---|---|---|---|\n| EV-001 | validation | PASS | validate completed successfully |\n| EV-002 | tests | PASS | complete unittest suite passed |\n| EV-003 | fingerprint | PASS | fingerprint matches reviewed payload |",
             "Findings": "none",
-            "Agent Links": "- https://github.com/tony-apan/zcode_skills/blob/v3.0.0/agents/github.md",
+            "Agent Links": "- https://github.com/tony-apan/zcode_skills/blob/v3.0.1/agents/github.md",
             "Improvements": "| improvement-id | user-value | evidence-ref |\n|---|---|---|\n| IMP-001 | Users receive only payloads independently reconciled with Git. | EV-003 |",
             "Blockers": "none",
             "Unverified": "none",
@@ -97,7 +97,7 @@ class ReleaseGateTests(unittest.TestCase):
         order = heading_order or list(release_gate.REQUIRED_HEADINGS)
         frontmatter = "\n".join("{}: {}".format(key, value) for key, value in fields.items())
         body = "\n\n".join("## {}\n\n{}".format(name, sections[name]) for name in order)
-        self.write("release-audits/v3.0.0.md", "---\n{}\n---\n\n# Release Gate v3.0.0\n\n{}\n".format(frontmatter, body))
+        self.write("release-audits/v3.0.1.md", "---\n{}\n---\n\n# Release Gate v3.0.1\n\n{}\n".format(frontmatter, body))
         return fields["package_fingerprint"]
 
     def test_valid_worktree_report_passes_and_audit_report_is_excluded(self):
@@ -105,8 +105,8 @@ class ReleaseGateTests(unittest.TestCase):
         changed, removed = release_gate.release_diff(self.root, "v2.0.0", "WORKTREE:" + fingerprint, None)
         self.assertEqual(changed, ["agents/github.md", "new.txt"])
         self.assertEqual(removed, ["removed.txt"])
-        self.assertNotIn("release-audits/v3.0.0.md", release_gate.payload_paths(self.root))
-        self.assertIn("PASS", release_gate.check_gate(self.root, "3.0.0", None))
+        self.assertNotIn("release-audits/v3.0.1.md", release_gate.payload_paths(self.root))
+        self.assertIn("PASS", release_gate.check_gate(self.root, "3.0.1", None))
 
     def test_audit_readme_changes_fingerprint_and_enters_diff(self):
         before = release_gate.package_fingerprint(self.root)
@@ -117,9 +117,9 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertNotEqual(before, after)
         changed, _ = release_gate.release_diff(self.root, "v2.0.0", "WORKTREE:" + after, None)
         self.assertIn("release-audits/README.md", changed)
-        self.write("release-audits/v3.0.0.md", "audit one\n")
+        self.write("release-audits/v3.0.1.md", "audit one\n")
         audit_fingerprint = release_gate.package_fingerprint(self.root)
-        self.write("release-audits/v3.0.0.md", "audit two\n")
+        self.write("release-audits/v3.0.1.md", "audit two\n")
         self.assertEqual(audit_fingerprint, release_gate.package_fingerprint(self.root))
 
     def test_tracked_ignored_env_and_log_are_payload_but_untracked_ignored_are_not(self):
@@ -222,10 +222,10 @@ class ReleaseGateTests(unittest.TestCase):
         other.mkdir()
         (other / "release-audits").mkdir()
         (other / "release-audits" / "README.md").write_text("rules\n", encoding="utf-8")
-        (other / "release-audits" / "v3.0.0.md").write_text("audit\n", encoding="utf-8")
+        (other / "release-audits" / "v3.0.1.md").write_text("audit\n", encoding="utf-8")
         paths = [path.as_posix() for path in release_gate.payload_paths(other)]
         self.assertIn("release-audits/README.md", paths)
-        self.assertNotIn("release-audits/v3.0.0.md", paths)
+        self.assertNotIn("release-audits/v3.0.1.md", paths)
 
     def test_diff_declaration_missing_extra_removed_and_agent_mismatch_fail(self):
         cases = (
@@ -339,7 +339,7 @@ class ReleaseGateTests(unittest.TestCase):
         fields = self.fields()
         fields.pop("reviewer")
         self.write_audit(fields)
-        audit = self.root / "release-audits" / "v3.0.0.md"
+        audit = self.root / "release-audits" / "v3.0.1.md"
         audit.write_text(audit.read_text(encoding="utf-8").replace("reviewer: github\n", ""), encoding="utf-8")
         with self.assertRaisesRegex(release_gate.GateError, "reviewer"):
             release_gate.check_gate(self.root, None, None)
@@ -355,7 +355,7 @@ class ReleaseGateTests(unittest.TestCase):
 
     def test_worktree_audit_passes_after_commit_in_clean_ci_index(self):
         fingerprint = self.write_audit()
-        self.git("add", "release-audits/v3.0.0.md")
+        self.git("add", "release-audits/v3.0.1.md")
         self.git("commit", "-qm", "release candidate")
         self.assertEqual(fingerprint, release_gate.package_fingerprint(self.root))
         self.assertFalse(release_gate.staged_payload_paths(self.root))

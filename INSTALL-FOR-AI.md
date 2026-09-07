@@ -1,9 +1,9 @@
 # ZCode 专用 AI 自适配 Bootstrap 安装协议
 
-本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v3.0.0`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
+本协议供 ZCode 中的 AI 执行。用户可以只提供仓库 URL，本地无需预先存在仓库。目标版本固定为 `v3.0.1`，仓库固定为 `https://github.com/tony-apan/zcode_skills`。
 
 > [!NOTE]
-> release audit 只约束仓库维护者的 push 和发版。普通用户安装、更新或卸载 `v3.0.0` 不需要运行 `release_gate.py`、安装 Git hook 或调用 `github` 智能体，不影响现有安装流程。
+> release audit 和 PR-only 规则只约束仓库维护者的 push 和发版。普通用户安装、更新或卸载 `v3.0.1` 不需要运行 `release_gate.py`、安装 Git hook、创建 PR 或调用 `github` 智能体，不影响现有安装流程。
 
 > 三种模式互斥：插件模式、AI 自适配模式、脚本手工模式只能选一种。本协议只执行 **AI 自适配**；禁止同时安装插件，禁止直接复制或覆盖 `agents/*.md`。
 
@@ -19,7 +19,7 @@
 
 ## 阶段 0：环境与 state 预检
 
-写入前识别当前 OS，并确认 Git、Python >= 3.9 可执行；Windows 另确认 PowerShell >= 5.1。请求 tag 必须是固定的 `v3.0.0`，不是分支或其他版本。无法验证的前提应停止并报告。
+写入前识别当前 OS，并确认 Git、Python >= 3.9 可执行；Windows 另确认 PowerShell >= 5.1。请求 tag 必须是固定的 `v3.0.1`，不是分支或其他版本。无法验证的前提应停止并报告。
 
 macOS / Linux：
 
@@ -45,7 +45,7 @@ $State = Join-Path $env:USERPROFILE '.zcode\agents\.tony-agents-pack\state.json'
 - 不存在 state：进入首次安装流程。
 - 存在 state：只读取其中无 secrets 的 `package` 与 `version`。
 - `package` 不是 `tony-agents-pack`：停止并报告，不接管该 state。
-- `version` 已是 `3.0.0` 且用户未明确要求重装：停止写入并报告已安装。
+- `version` 已是 `3.0.1` 且用户未明确要求重装：停止写入并报告已安装。
 - 版本不同：进入更新流程。
 - 只有用户明确说“重装”或“覆盖”时才可进入强制重装流程并使用 `install --force`；不得由 AI 自行决定强制覆盖。
 
@@ -56,8 +56,8 @@ $State = Join-Path $env:USERPROFILE '.zcode\agents\.tony-agents-pack\state.json'
 macOS / Linux：
 
 ```sh
-WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v3.0.0.XXXXXX")
-git clone --branch v3.0.0 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
+WORKTREE=$(mktemp -d "${TMPDIR:-/tmp}/tony-agents-pack-v3.0.1.XXXXXX")
+git clone --branch v3.0.1 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills "$WORKTREE"
 git -C "$WORKTREE" describe --tags --exact-match HEAD
 git -C "$WORKTREE" status --short
 ```
@@ -65,13 +65,13 @@ git -C "$WORKTREE" status --short
 Windows PowerShell 5.1+：
 
 ```powershell
-$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v3.0.0-" + [guid]::NewGuid().ToString("N"))
-git clone --branch v3.0.0 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
+$Worktree = Join-Path $env:TEMP ("tony-agents-pack-v3.0.1-" + [guid]::NewGuid().ToString("N"))
+git clone --branch v3.0.1 --single-branch --depth 1 https://github.com/tony-apan/zcode_skills $Worktree
 git -C $Worktree describe --tags --exact-match HEAD
 git -C $Worktree status --short
 ```
 
-核验输出必须精确包含 `v3.0.0`，且新 clone 应为干净工作树。clone 后切换到仓库根目录并重新读取 `INSTALL-FOR-AI.md`；继续执行时仍受用户发送的主提示词约束。
+核验输出必须精确包含 `v3.0.1`，且新 clone 应为干净工作树。clone 后切换到仓库根目录并重新读取 `INSTALL-FOR-AI.md`；继续执行时仍受用户发送的主提示词约束。
 
 ## 阶段 2：生成脱敏模型映射
 
@@ -146,7 +146,7 @@ py -3 scripts/manage.py install --model-map $ModelMap
 
 ### 更新流程
 
-更新必须使用阶段 1 已核验的固定 tag `v3.0.0` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
+更新必须使用阶段 1 已核验的固定 tag `v3.0.1` 仓库。默认保留当前有效 model/thoughtLevel；只有用户明确要求“重新分配模型”时，才执行阶段 2 并在 update 中传 `--model-map`。
 
 macOS / Linux：
 
@@ -164,7 +164,7 @@ py -3 scripts/manage.py update --dry-run
 py -3 scripts/manage.py update
 ```
 
-重新分配时，在两条 update 命令后增加 `--model-map` 及阶段 2 实际生成的路径。v3.0.0 的 breaking 变更仅影响 `github` RELEASE_GATE 和维护者 push 流程；普通安装 state schema 不变，管理器仍会三方合并并保护本地模型字段与其他本地修改。update dry-run 出现冲突或本地修改时逐条报告；三方合并冲突必须人工处理，不得自动取任一侧。冲突或 Git merge 不可用时保留原文件并生成 `*.tony-agents-pack.incoming`，不得自动覆盖。若 update 报告 `Reinstalled missing`，说明该文件之前被删除，现已按包内版本恢复。正式更新前会创建覆盖新旧集合的 snapshot。
+重新分配时，在两条 update 命令后增加 `--model-map` 及阶段 2 实际生成的路径。v3.0.1 仅更新维护者 PR-only 发布文档，无智能体契约变化；v3 的 breaking 变更仍只影响 `github` RELEASE_GATE 和维护者 push 流程。普通安装 state schema 不变，管理器仍会三方合并并保护本地模型字段与其他本地修改。update dry-run 出现冲突或本地修改时逐条报告；三方合并冲突必须人工处理，不得自动取任一侧。冲突或 Git merge 不可用时保留原文件并生成 `*.tony-agents-pack.incoming`，不得自动覆盖。若 update 报告 `Reinstalled missing`，说明该文件之前被删除，现已按包内版本恢复。正式更新前会创建覆盖新旧集合的 snapshot。
 
 ### 强制重装流程
 
@@ -189,11 +189,11 @@ py -3 scripts/manage.py update
 
 ## 独立更新入口
 
-用户直接提出更新时，仍先执行阶段 0 并检查默认 state 路径，再按需执行阶段 1。state 同为 `3.0.0` 时不重复；旧版本按阶段 3 更新。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming、本地修改保护和临时 clone 清理结果。
+用户直接提出更新时，仍先执行阶段 0 并检查默认 state 路径，再按需执行阶段 1。state 同为 `3.0.1` 时不重复；旧版本按阶段 3 更新。除非用户明确要求重新分配，否则禁止运行 inventory，且 update 不传 model-map。必须报告 incoming、本地修改保护和临时 clone 清理结果。
 
 ## 卸载流程
 
-卸载先检查默认 state `~/.zcode/agents/.tony-agents-pack/state.json`（Windows 为 `%USERPROFILE%\.zcode\agents\.tony-agents-pack\state.json`），再执行阶段 1 获取并核验 `v3.0.0`。确认 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
+卸载先检查默认 state `~/.zcode/agents/.tony-agents-pack/state.json`（Windows 为 `%USERPROFILE%\.zcode\agents\.tony-agents-pack\state.json`），再执行阶段 1 获取并核验 `v3.0.1`。确认 state 的 `package` 是 `tony-agents-pack` 后，先 dry-run 并解释计划，再正式执行。
 
 macOS / Linux：
 
@@ -210,3 +210,9 @@ py -3 scripts/manage.py uninstall
 ```
 
 卸载只删除 SHA 与 state 一致的包文件；安装前存在的同名文件会从 backup 恢复。用户修改的文件不得删除，管理器会保留并可能生成 `*.tony-agents-pack.restore` 候选。最终报告删除项、恢复项、保留项、restore 候选、剩余 state（如有）、卸载前 snapshot 路径和临时 clone 清理结果。
+
+## 维护者 PR-only 发布说明
+
+本节仅供仓库维护者使用，不改变上述普通安装、更新或卸载流程。远端 `main` 保护规则为 PR-only，required checks 是 `validate (ubuntu-latest, 3.9)`、`validate (macos-latest, 3.9)`、`validate (windows-latest, 3.9)`，并启用 strict、admins enforced、linear history、conversation resolution；禁止 force push 和删除受保护分支。required approving review count 为 `0`，用于避免单人仓库自锁，不代表可跳过 PR、required checks 或对话解决要求。
+
+若当前在 `main` 且已有改动，先创建功能分支再工作，禁止 direct push main。完成 audit 并取得 gate PASS 后，在功能分支 commit/push 并创建 PR；等待三个 required checks 全部通过且所有对话已解决后 merge main。随后更新本地 `main`，再运行 `release.sh` 或等价的 Windows 验证与 annotated tag 流程；最终向用户提供 PR、checks、audit 与 release/tag 链接。

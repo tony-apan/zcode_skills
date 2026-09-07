@@ -452,7 +452,40 @@ class ManageTests(unittest.TestCase):
         self.assertEqual(plugin["version"], changelog_match.group(1))
         self.assertEqual(plugin["version"], prompt_match.group(1))
         self.assertIn("20 岗逐个完成红队强化", changelog)
-        self.assertIn("每次维护者 push", changelog)
+        self.assertIn("PR-only", changelog)
+        self.assertIn("无智能体契约变更", changelog)
+
+    def test_release_docs_require_pr_only_main_flow(self):
+        required = (
+            "PR-only",
+            "validate (ubuntu-latest, 3.9)",
+            "validate (macos-latest, 3.9)",
+            "validate (windows-latest, 3.9)",
+            "strict",
+            "admins enforced",
+            "linear history",
+            "conversation resolution",
+            "required approving review count",
+            "禁止 direct push main",
+        )
+        for filename in ("README.md", "INSTALL-FOR-AI.md"):
+            text = (self.package / filename).read_text(encoding="utf-8")
+            for marker in required:
+                self.assertIn(marker, text, filename)
+
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        for marker in (
+            "commit branch",
+            "push branch",
+            "required checks",
+            "merge main",
+            "gate PASS 后在功能分支 commit/push",
+            "更新本地 main",
+            "release.sh 创建 tag",
+            "最终给用户输出",
+            "rules config",
+        ):
+            self.assertIn(marker, readme)
 
     def test_readme_first_screen_has_beginner_prerequisites(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
@@ -480,11 +513,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v3.0.0",
+            "tag=v3.0.1",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 3.0.0",
+            "同为 3.0.1",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -514,9 +547,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v3.0.0 --single-branch --depth 1",
+            "--branch v3.0.1 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `3.0.0`",
+            "同为 `3.0.1`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
