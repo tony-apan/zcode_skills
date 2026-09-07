@@ -2,6 +2,26 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [2.0.0] — 2026-09-07
+
+### Breaking changes
+- 20 岗逐个完成红队强化，输入、输出与交接契约均有变更。已安装用户应按 README 的更新提示词升级；安装器继续通过三方合并保护本地模型绑定和其他本地修改，冲突须人工处理。
+- 五个验收岗统一采用 `PASS | BLOCK | INCONCLUSIVE` 公共协议；`INCONCLUSIVE` 表示核心证据不足、不得交付，不代表已发现缺陷。`shencha-content` 拆分为 seo、conversion、social、email、microcopy 五个 profile。
+
+### 工程
+- coder 四岗按日常、攻坚、并行分流和长上下文差异化路由；并行实现要求独立 worktree、固定基线和候选隔离，并补充永久高危命令禁令与可复跑证据。
+- frontend 明确实现/原型模式、无障碍与截图证据协议，并删除本地私有 skill 元数据。
+- mermaid 固定单一代码块、输入净化、集合对账并保留 `graph TD`，禁止 `click` 等可执行或外联语法。
+
+### 内容增长
+- writer 增加 A-E 任务模式与每稿成功定义；writer-pro 增加受控双稿盲测协议。
+- seoer 增加可计算评分和 SERP 快照；sheyun 增加 S1-S4 模式并固定 `review_profile=social` 审查交接。
+- outreach 分离内容与发送状态，默认 `SEND_BLOCKED`；huoke 增加证据类型分级与结构化交接。
+
+### 情报与验收
+- jiankong 增加 `pending` 状态机和 SSRF 防线；tijian 区分被动公开检查与需明确授权的 `ACTIVE_SECURITY`，技术 SEO/CWV 无证据时保持未知。
+- verifier 在无已证明沙箱时不执行不可信代码；github 从工具元数据硬移除 Bash/Write/Edit，并通过 `disallowedTools` 明确禁止，保持只读体检。
+
 ## [1.2.1] — 2026-09-07
 
 ### 改进

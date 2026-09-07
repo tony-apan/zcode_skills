@@ -23,6 +23,10 @@ EXPECTED_AGENT_COUNT = 20
 COLORS = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
 TOOLS = {"Read", "Glob", "Grep", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "TodoWrite"}
 FORBIDDEN_PUBLISHED_KEYS = {"model", "thoughtLevel", "skills"}
+PUBLISHED_MODEL_NAME_RE = re.compile(r"(?i)\b(?:glm|gpt|deepseek|kimi|gemini)\b")
+INJECTION_DEFENSE_RE = re.compile(r"注入防御|不可信内容(?:与[^\n#]*)?防线|不可信内容|不可信数据|提示注入")
+COMMON_ACCEPTANCE_MARKER = "report-id / role / requirement-version / snapshot(commit/source/artifact SHA/build-id) / generated-at"
+ACCEPTANCE_AGENTS = {"shencha", "shencha-content", "shencha-ui", "verifier", "shencha-final"}
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$")
 
@@ -143,7 +147,7 @@ def parse_frontmatter(text: str) -> Dict[str, object]:
         key, value = match.group(1), (match.group(2) or "").strip()
         if key in result:
             raise PackError("duplicate top-level frontmatter key: {}".format(key))
-        if key == "tools":
+        if key in {"tools", "disallowedTools"}:
             if value:
                 if not (value.startswith("[") and value.endswith("]")):
                     raise PackError("tools must be an inline array or an indented list")
@@ -194,6 +198,8 @@ def validate_agent_text(text: str, expected_name: Optional[str] = None, publishe
         forbidden = sorted(FORBIDDEN_PUBLISHED_KEYS.intersection(metadata))
         if forbidden:
             raise PackError("published agent contains local-only keys: {}".format(", ".join(forbidden)))
+        if PUBLISHED_MODEL_NAME_RE.search(metadata["description"]):
+            raise PackError("published description contains a concrete model or vendor name")
     model = metadata.get("model")
     if model is not None and (not isinstance(model, str) or not model.startswith("custom:")):
         raise PackError("model must be a custom: model identifier")
@@ -294,11 +300,34 @@ def validate_package(verbose: bool = True) -> bool:
     for name, path in agents.items():
         try:
             text = path.read_text(encoding="utf-8")
-            validate_agent_text(text, name, published=True)
+            metadata = validate_agent_text(text, name, published=True)
             if "# 模型需求：" not in text:
                 raise PackError("missing model requirement comment")
-            if not re.search(r"注入防御|不可信内容防线|提示注入", text):
+            if not INJECTION_DEFENSE_RE.search(text):
                 raise PackError("missing prompt-injection defense")
+            if name in ACCEPTANCE_AGENTS:
+                for marker in ("PASS", "BLOCK", "INCONCLUSIVE", COMMON_ACCEPTANCE_MARKER):
+                    if marker not in text:
+                        raise PackError("missing acceptance marker: {}".format(marker))
+            if name == "github":
+                forbidden_tools = {"Bash", "Write", "Edit"}
+                if forbidden_tools.intersection(metadata["tools"]):
+                    raise PackError("github tools must be strictly read-only")
+                if not forbidden_tools.issubset(set(metadata.get("disallowedTools", []))):
+                    raise PackError("github disallowedTools must include Bash, Write, and Edit")
+            role_markers = {
+                "frontend": ("## 模式", "可访问性", "截图"),
+                "mermaid": ("永远只输出一个 `mermaid` 代码块", "`graph TD`", "`click`", "集合"),
+                "shencha-content": ("review_profile=seo|conversion|social|email|microcopy",),
+                "outreach": ("SEND_BLOCKED",),
+                "huoke": ("## 证据分类",),
+                "jiankong": ("pending",),
+                "tijian": ("ACTIVE_SECURITY",),
+                "coder-ds": ("MODE=PARALLEL_ALTERNATIVE", "MODE=OVERFLOW"),
+            }
+            for marker in role_markers.get(name, ()):
+                if marker not in text:
+                    raise PackError("missing role contract marker: {}".format(marker))
             if verbose:
                 print("OK agent {}".format(path.name))
         except (OSError, UnicodeError, PackError) as exc:

@@ -320,7 +320,7 @@ class ManageTests(unittest.TestCase):
         target = self.target / "coder.md"
         source = self.package / "agents" / "coder.md"
         base_text = target.read_text(encoding="utf-8")
-        marker = "你是资深软件工程师，负责把主智能体交给你的开发任务实现成可运行、可验证的代码。"
+        marker = "你是资深软件工程师，负责把边界清楚的日常开发任务实现成可运行、可验证的代码。"
         self.assertIn(marker, base_text)
         target.write_text(base_text.replace(marker, "LOCAL CUSTOMIZATION"), encoding="utf-8")
         source_text = source.read_text(encoding="utf-8")
@@ -366,6 +366,64 @@ class ManageTests(unittest.TestCase):
     def test_validate_passes(self):
         self.assertTrue(manage.validate_package(verbose=False))
 
+    def test_published_agents_strip_local_metadata_and_model_names(self):
+        agents = sorted((self.package / "agents").glob("*.md"))
+        self.assertEqual(len(agents), manage.EXPECTED_AGENT_COUNT)
+        for path in agents:
+            text = path.read_text(encoding="utf-8")
+            metadata = manage.parse_frontmatter(text)
+            self.assertTrue(manage.FORBIDDEN_PUBLISHED_KEYS.isdisjoint(metadata), path.name)
+            self.assertIsNone(manage.PUBLISHED_MODEL_NAME_RE.search(metadata["description"]), path.name)
+            self.assertRegex(text, manage.INJECTION_DEFENSE_RE, path.name)
+
+    def test_github_metadata_is_hard_read_only(self):
+        metadata = manage.parse_frontmatter((self.package / "agents" / "github.md").read_text(encoding="utf-8"))
+        forbidden = {"Bash", "Write", "Edit"}
+        self.assertTrue(forbidden.isdisjoint(metadata["tools"]))
+        self.assertTrue(forbidden.issubset(set(metadata["disallowedTools"])))
+
+    def test_frontend_has_no_skills_metadata(self):
+        metadata = manage.parse_frontmatter((self.package / "agents" / "frontend.md").read_text(encoding="utf-8"))
+        self.assertNotIn("skills", metadata)
+
+    def test_mermaid_contract_markers(self):
+        text = (self.package / "agents" / "mermaid.md").read_text(encoding="utf-8")
+        for marker in (
+            "永远只输出一个 `mermaid` 代码块",
+            "`graph TD`",
+            "禁止任何可执行或外联语法",
+            "`click`",
+            "DeclaredNodes",
+            "EdgeEndpoints",
+            "ClassifiedNodes",
+            "UsedClasses",
+        ):
+            self.assertIn(marker, text)
+
+    def test_acceptance_agents_share_verdict_and_report_markers(self):
+        for name in manage.ACCEPTANCE_AGENTS:
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            for marker in ("PASS", "BLOCK", "INCONCLUSIVE", manage.COMMON_ACCEPTANCE_MARKER):
+                self.assertIn(marker, text, name)
+
+    def test_content_review_has_five_profiles(self):
+        text = (self.package / "agents" / "shencha-content.md").read_text(encoding="utf-8")
+        for profile in ("seo", "conversion", "social", "email", "microcopy"):
+            self.assertIn("- `" + profile + "`：", text)
+
+    def test_specialized_role_contract_markers(self):
+        markers = {
+            "outreach": ("SEND_BLOCKED",),
+            "huoke": ("evidence_type", "contact_grade", "## 证据分类"),
+            "jiankong": ("pending",),
+            "tijian": ("ACTIVE_SECURITY",),
+            "coder-ds": ("MODE=PARALLEL_ALTERNATIVE", "MODE=OVERFLOW"),
+        }
+        for name, required in markers.items():
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            for marker in required:
+                self.assertIn(marker, text, name)
+
     def test_validate_requires_powershell_installer(self):
         (self.package / "scripts" / "install.ps1").unlink()
         stderr = io.StringIO()
@@ -388,7 +446,7 @@ class ManageTests(unittest.TestCase):
         self.assertIsNotNone(prompt_match)
         self.assertEqual(plugin["version"], changelog_match.group(1))
         self.assertEqual(plugin["version"], prompt_match.group(1))
-        self.assertIn("17 个 `agents/*.md` 岗位定义与契约未改动", changelog)
+        self.assertIn("20 岗逐个完成红队强化", changelog)
 
     def test_readme_first_screen_has_beginner_prerequisites(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
@@ -416,11 +474,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v1.2.1",
+            "tag=v2.0.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 1.2.1",
+            "同为 2.0.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -450,9 +508,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v1.2.1 --single-branch --depth 1",
+            "--branch v2.0.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `1.2.1`",
+            "同为 `2.0.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
