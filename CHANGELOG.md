@@ -12,7 +12,7 @@
 - 每次维护者 push、PR 和 tag 都必须具有 `github` 智能体 `MODE=RELEASE_GATE` 的真实 PASS 审计；pre-push hook、三平台 CI 与 `release.sh` 共同执行硬门禁，普通安装用户不受影响。
 - 新增确定性 package fingerprint。Git 仓库中只纳入 tracked 与非 ignored untracked 发布路径；仅版本审计报告 `release-audits/v*.md`、Python cache、根目录 checksum 和明确安装运行产物排除，audit README 等治理文件参与。每项同时哈希路径、类型、内容或 symlink target 以及 executable bit。
 - `github` 新增 `REPO_REVIEW`、`README_POLISH`、`RELEASE_GATE`、`RELEASE_NOTES` 四种模式，保持无 Bash/Write/Edit 的硬只读边界。
-- package fingerprint 的 tracked 路径、类型、executable marker 与内容全部绑定 Git index mode/blob，并通过 `git cat-file blob` 读取原始字节，避免 Windows checkout CRLF 和 filesystem mode 与 POSIX 不一致；PASS 审计前要求暂存所有发布文件且不得残留未暂存发布改动。
+- package fingerprint 的 tracked 路径、类型、executable marker 与内容全部绑定 Git index mode/blob，并通过 `git cat-file blob` 读取原始字节，避免 checkout 换行转换和 filesystem mode 造成跨平台差异；PASS 审计前要求暂存所有发布文件，Git 识别为真实内容差异的 unstaged 发布路径会阻断。
 - GitHub Actions 的 checkout、Python setup 和 artifact upload 全部固定到由 GitHub refs API 解析的官方完整 commit SHA，同时保持最小 `contents: read` 权限。
 
 ### 用户价值

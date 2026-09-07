@@ -575,23 +575,13 @@ def validate_hand_off(section: str) -> set:
 
 def check_gate(root: Path, requested_version: Optional[str], commit: Optional[str]) -> str:
     root = root.resolve()
+    git_output(root, ["rev-parse", "--is-inside-work-tree"])
     version = package_version(root)
     if requested_version is not None and requested_version != version:
         raise GateError("requested version {} does not match plugin version {}".format(requested_version, version))
-    fingerprint = package_fingerprint(root)
     audit_path = root / "release-audits" / ("v" + version + ".md")
     if not audit_path.is_file():
         raise GateError("PASS audit is missing: {}".format(audit_path))
-    untracked = untracked_payload_paths(root)
-    if untracked:
-        raise GateError(
-            "stage release files before audit: {}".format(", ".join(path.as_posix() for path in untracked))
-        )
-    unstaged = unstaged_payload_paths(root)
-    if unstaged:
-        raise GateError(
-            "stage all release changes before audit: {}".format(", ".join(path.as_posix() for path in unstaged))
-        )
     try:
         metadata, body = parse_audit(audit_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError) as exc:
@@ -602,6 +592,18 @@ def check_gate(root: Path, requested_version: Optional[str], commit: Optional[st
     for field in REQUIRED_FIELDS:
         if PLACEHOLDER_RE.search(metadata[field]):
             raise GateError("audit {} contains a placeholder".format(field))
+    validate_base_ref(root, metadata["base_ref"], version)
+    untracked = untracked_payload_paths(root)
+    if untracked:
+        raise GateError(
+            "stage release files before audit: {}".format(", ".join(path.as_posix() for path in untracked))
+        )
+    unstaged = unstaged_payload_paths(root)
+    if unstaged:
+        raise GateError(
+            "stage all release changes before audit: {}".format(", ".join(path.as_posix() for path in unstaged))
+        )
+    fingerprint = package_fingerprint(root)
     expected = {
         "version": version,
         "verdict": "PASS",
@@ -615,7 +617,6 @@ def check_gate(root: Path, requested_version: Optional[str], commit: Optional[st
             raise GateError("audit {} must be {!r}, found {!r}".format(field, value, metadata[field]))
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", metadata["reviewed_at"]):
         raise GateError("audit reviewed_at must be an ISO-8601 timestamp with timezone")
-    validate_base_ref(root, metadata["base_ref"], version)
     target_ref = metadata["target_ref"]
     worktree_ref = "WORKTREE:" + fingerprint
     if target_ref.startswith("WORKTREE:") and target_ref != worktree_ref:

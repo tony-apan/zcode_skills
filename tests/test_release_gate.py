@@ -160,9 +160,23 @@ class ReleaseGateTests(unittest.TestCase):
         self.git("add", "agents/github.md")
         self.assertNotEqual(before, release_gate.package_fingerprint(self.root))
 
-    def test_unstaged_crlf_change_does_not_change_index_fingerprint_and_check_rejects(self):
+    def test_worktree_crlf_checkout_does_not_change_index_fingerprint(self):
         before = release_gate.package_fingerprint(self.root)
-        (self.root / "agents" / "github.md").write_bytes(b"v3 contract\r\n")
+        path = self.root / "agents" / "github.md"
+        path.write_bytes(b"v3 contract\r\n")
+        self.assertEqual(before, release_gate.package_fingerprint(self.root))
+        self.git("checkout", "--", "agents/github.md")
+
+    def test_unstaged_content_change_rejected(self):
+        before = release_gate.package_fingerprint(self.root)
+        path = self.root / "agents" / "github.md"
+        with path.open("ab") as handle:
+            handle.write(b"UNSTAGED\n")
+        diff = subprocess.run(
+            [shutil.which("git"), "-C", str(self.root), "diff", "--quiet", "--", "agents/github.md"],
+            check=False,
+        )
+        self.assertNotEqual(diff.returncode, 0)
         self.assertEqual(before, release_gate.package_fingerprint(self.root))
         self.write_audit({"package_fingerprint": before})
         with self.assertRaisesRegex(release_gate.GateError, "stage all release changes before audit: agents/github.md"):
