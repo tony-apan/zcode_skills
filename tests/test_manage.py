@@ -7,7 +7,42 @@ import unittest
 from unittest import mock
 from contextlib import redirect_stderr, redirect_stdout
 import io
+import os
 import re
+import stat
+import struct
+import zlib
+
+
+def make_tree_owner_writable(root):
+    root = Path(root)
+    for current, directories, files in os.walk(root, followlinks=False):
+        current_path = Path(current)
+        current_path.chmod(current_path.stat().st_mode | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        for name in directories:
+            path = current_path / name
+            if not path.is_symlink():
+                path.chmod(path.stat().st_mode | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        for name in files:
+            path = current_path / name
+            if not path.is_symlink():
+                path.chmod(path.stat().st_mode | stat.S_IRUSR | stat.S_IWUSR)
+
+
+def png_chunk(chunk_type, data=b""):
+    payload = chunk_type + data
+    return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+
+
+def minimal_png():
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+    scanline = b"\x00\x00\x00\x00\x00"
+    return (
+        manage.PNG_SIGNATURE
+        + png_chunk(b"IHDR", ihdr)
+        + png_chunk(b"IDAT", zlib.compress(scanline))
+        + png_chunk(b"IEND")
+    )
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,7 +70,10 @@ class ManageTests(unittest.TestCase):
         shutil.copy2(ROOT / "LICENSE", self.package / "LICENSE")
         shutil.copy2(ROOT / "CHANGELOG.md", self.package / "CHANGELOG.md")
         shutil.copy2(ROOT / "README.md", self.package / "README.md")
+        shutil.copy2(ROOT / "MODEL_SETUP.md", self.package / "MODEL_SETUP.md")
         shutil.copy2(ROOT / "INSTALL-FOR-AI.md", self.package / "INSTALL-FOR-AI.md")
+        shutil.copytree(ROOT / "docs", self.package / "docs")
+        make_tree_owner_writable(self.package)
         self.target = self.temp / "home" / ".zcode" / "agents"
         self.patches = [
             mock.patch.object(manage, "ROOT", self.package),
@@ -365,6 +403,42 @@ class ManageTests(unittest.TestCase):
         state = manager.load_state(required=True)
         self.assertEqual(state["files"]["coder"]["installed_sha"], manage.sha256_bytes(before))
 
+    def test_make_tree_owner_writable_enables_fixture_mutations(self):
+        fixture = self.temp / "readonly-fixture"
+        nested = fixture / "nested"
+        nested.mkdir(parents=True)
+        regular = nested / "fixture.txt"
+        regular.write_text("original\n", encoding="utf-8")
+        regular.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+        nested.chmod(stat.S_IRUSR | stat.S_IXUSR)
+        fixture.chmod(stat.S_IRUSR | stat.S_IXUSR)
+
+        make_tree_owner_writable(fixture)
+
+        regular.write_text("updated\n", encoding="utf-8")
+        (nested / "created.txt").write_text("created\n", encoding="utf-8")
+        (fixture / "created-dir").mkdir()
+        regular.unlink()
+        self.assertTrue(os.access(fixture, os.W_OK))
+        self.assertTrue(os.access(nested, os.W_OK))
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "symlinks are unsupported")
+    def test_make_tree_owner_writable_does_not_follow_symlinks(self):
+        fixture = self.temp / "readonly-links"
+        fixture.mkdir()
+        outside = self.temp / "outside.txt"
+        outside.write_text("outside\n", encoding="utf-8")
+        outside.chmod(stat.S_IRUSR)
+        link = fixture / "outside-link"
+        try:
+            link.symlink_to(outside)
+        except OSError as exc:
+            self.skipTest("cannot create symlink: {}".format(exc))
+
+        make_tree_owner_writable(fixture)
+
+        self.assertEqual(stat.S_IMODE(outside.stat().st_mode) & stat.S_IWUSR, 0)
+
     def test_validate_passes(self):
         self.assertTrue(manage.validate_package(verbose=False))
 
@@ -436,6 +510,118 @@ class ManageTests(unittest.TestCase):
             self.assertFalse(manage.validate_package(verbose=False))
         self.assertIn("missing required release file: scripts/install.ps1", stderr.getvalue())
 
+    def assert_validation_fails_with(self, marker):
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            self.assertFalse(manage.validate_package(verbose=False))
+        self.assertIn(marker, stderr.getvalue())
+
+    def test_validate_requires_each_release_png(self):
+        for relative in manage.RELEASE_PNGS:
+            with self.subTest(relative=relative):
+                path = self.package / relative
+                original = path.read_bytes()
+                path.unlink()
+                self.assert_validation_fails_with("missing required release file: {}".format(relative))
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(original)
+
+    def test_validate_png_structure_accepts_standard_library_minimal_png(self):
+        manage.validate_png_structure(minimal_png())
+
+    def test_validate_png_structure_rejects_truncated_png(self):
+        with self.assertRaisesRegex(manage.PackError, "truncated|boundary"):
+            manage.validate_png_structure(minimal_png()[:-1])
+
+    def test_validate_png_structure_rejects_bad_crc(self):
+        data = bytearray(minimal_png())
+        data[-5] ^= 0x01
+        with self.assertRaisesRegex(manage.PackError, "invalid CRC"):
+            manage.validate_png_structure(bytes(data))
+
+    def test_validate_png_structure_rejects_missing_ihdr(self):
+        data = manage.PNG_SIGNATURE + png_chunk(b"IDAT", zlib.compress(b"\x00")) + png_chunk(b"IEND")
+        with self.assertRaisesRegex(manage.PackError, "must start with a 13-byte IHDR"):
+            manage.validate_png_structure(data)
+
+    def test_validate_png_structure_rejects_missing_idat(self):
+        ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)
+        data = manage.PNG_SIGNATURE + png_chunk(b"IHDR", ihdr) + png_chunk(b"IEND")
+        with self.assertRaisesRegex(manage.PackError, "does not contain an IDAT"):
+            manage.validate_png_structure(data)
+
+    def test_validate_png_structure_rejects_missing_iend(self):
+        data = minimal_png()[:-12]
+        with self.assertRaisesRegex(manage.PackError, "does not contain an IEND"):
+            manage.validate_png_structure(data)
+
+    def test_validate_png_structure_rejects_trailing_data(self):
+        with self.assertRaisesRegex(manage.PackError, "trailing data after IEND"):
+            manage.validate_png_structure(minimal_png() + b"trailing")
+
+    def test_validate_png_structure_rejects_oversized_chunk_before_slicing(self):
+        data = manage.PNG_SIGNATURE + struct.pack(">I", manage.MAX_PNG_CHUNK_BYTES + 1) + b"IHDR"
+        with self.assertRaisesRegex(manage.PackError, "oversized PNG chunk"):
+            manage.validate_png_structure(data)
+
+    def test_validate_png_structure_rejects_non_letter_chunk_type(self):
+        data = manage.PNG_SIGNATURE + struct.pack(">I", 0) + b"ID1T" + b"\x00\x00\x00\x00"
+        with self.assertRaisesRegex(manage.PackError, "not four ASCII letters"):
+            manage.validate_png_structure(data)
+
+    def test_validate_rejects_bad_png_signature(self):
+        path = self.package / manage.MODEL_SCREENSHOTS[0]
+        data = path.read_bytes()
+        path.write_bytes(b"NOT-PNG!" + data[len(manage.PNG_SIGNATURE):])
+        self.assert_validation_fails_with("does not have a valid PNG signature")
+
+    def test_validate_rejects_undersized_screenshot(self):
+        path = self.package / manage.MODEL_SCREENSHOTS[0]
+        path.write_bytes(minimal_png())
+        self.assert_validation_fails_with("must be larger than 10 KiB")
+
+    def test_validate_rejects_missing_readme_qr_marker(self):
+        readme = self.package / "README.md"
+        readme.write_text(readme.read_text(encoding="utf-8").replace('width="50%"', 'width="49%"'), encoding="utf-8")
+        self.assert_validation_fails_with('width="50%"')
+
+    def test_validate_requires_versioned_qr_markers(self):
+        readme = self.package / "README.md"
+        original = readme.read_text(encoding="utf-8")
+        markers = (
+            'src="{}"'.format(manage.QR_IMAGE),
+            'href="{}"'.format(manage.QR_IMAGE),
+            manage.QR_URL,
+            'alt="扫码入群"',
+            "仓库内图片固定随版本审计",
+        )
+        for marker in markers:
+            with self.subTest(marker=marker):
+                readme.write_text(original.replace(marker, "REMOVED", 1), encoding="utf-8")
+                self.assert_validation_fails_with(marker)
+        readme.write_text(original, encoding="utf-8")
+
+    def test_validate_requires_docs_and_model_setup_in_checksums(self):
+        workflow = self.package / ".github" / "workflows" / "validate.yml"
+        original = workflow.read_text(encoding="utf-8")
+        workflow.write_text(
+            original.replace("release-audits docs", "release-audits"), encoding="utf-8"
+        )
+        self.assert_validation_fails_with("checksum generation must include the docs directory")
+        workflow.write_text(original.replace(" MODEL_SETUP.md", ""), encoding="utf-8")
+        self.assert_validation_fails_with("checksum generation must include MODEL_SETUP.md")
+
+    def test_validate_rejects_incomplete_model_guide(self):
+        guide = self.package / "MODEL_SETUP.md"
+        guide.write_text(guide.read_text(encoding="utf-8").replace("硅基流动", "可选聚合平台"), encoding="utf-8")
+        self.assert_validation_fails_with("missing vendor keyword: 硅基流动")
+
+    def test_validate_rejects_model_guide_without_api_key_warning(self):
+        guide = self.package / "MODEL_SETUP.md"
+        text = guide.read_text(encoding="utf-8").replace("API Key", "访问凭证")
+        guide.write_text(text, encoding="utf-8")
+        self.assert_validation_fails_with("missing an API Key safety warning")
+
     def test_release_docs_identify_zcode_only_package(self):
         for filename in ("README.md", "INSTALL-FOR-AI.md"):
             text = (self.package / filename).read_text(encoding="utf-8")
@@ -487,6 +673,13 @@ class ManageTests(unittest.TestCase):
         ):
             self.assertIn(marker, readme)
 
+    def test_release_notes_use_none_when_agents_are_unchanged(self):
+        for filename in ("README.md", "INSTALL-FOR-AI.md"):
+            text = (self.package / filename).read_text(encoding="utf-8")
+            self.assertIn("智能体链接", text, filename)
+            self.assertIn("none", text, filename)
+            self.assertIn("不得生成未来版本的 agent 链接", text, filename)
+
     def test_readme_first_screen_has_beginner_prerequisites(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
         first_screen = "\n".join(readme.splitlines()[:60])
@@ -513,11 +706,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v3.0.1",
+            "tag=v3.1.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 3.0.1",
+            "同为 3.1.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -547,9 +740,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v3.0.1 --single-branch --depth 1",
+            "--branch v3.1.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `3.0.1`",
+            "同为 `3.1.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
