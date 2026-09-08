@@ -715,8 +715,9 @@ class ManageTests(unittest.TestCase):
     def test_changed_agent_body_parser_is_crlf_stable(self):
         for name in ("shencha-content", "sheyun"):
             published = (self.package / "agents" / (name + ".md")).read_bytes()
-            crlf = published.replace(b"\n", b"\r\n")
-            self.assertEqual(self.normalized_agent_body(crlf), self.normalized_agent_body(published), name)
+            lf = published.replace(b"\r\n", b"\n")
+            crlf = lf.replace(b"\n", b"\r\n")
+            self.assertEqual(self.normalized_agent_body(crlf), self.normalized_agent_body(lf), name)
 
     def test_local_changed_agent_sources_match_release_when_present(self):
         for name in ("shencha-content", "sheyun"):
