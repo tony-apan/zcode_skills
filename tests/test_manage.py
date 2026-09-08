@@ -582,8 +582,8 @@ class ManageTests(unittest.TestCase):
 
     def test_validate_rejects_missing_readme_qr_marker(self):
         readme = self.package / "README.md"
-        readme.write_text(readme.read_text(encoding="utf-8").replace('width="50%"', 'width="49%"'), encoding="utf-8")
-        self.assert_validation_fails_with('width="50%"')
+        readme.write_text(readme.read_text(encoding="utf-8").replace('width="25%"', 'width="50%"'), encoding="utf-8")
+        self.assert_validation_fails_with('width="25%"')
 
     def test_validate_requires_versioned_qr_markers(self):
         readme = self.package / "README.md"
@@ -600,6 +600,32 @@ class ManageTests(unittest.TestCase):
                 readme.write_text(original.replace(marker, "REMOVED", 1), encoding="utf-8")
                 self.assert_validation_fails_with(marker)
         readme.write_text(original, encoding="utf-8")
+
+    def test_readme_maintainer_gate_is_folded_into_details(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        summary = "<summary><strong>维护者专用：GitHub 发布审查与 PR 门禁</strong></summary>"
+        heading = "### 每次 push 前必须 GitHub 智能体审查"
+        advanced_summary = "<summary><strong>高级安装、兼容性与维护</strong></summary>"
+        self.assertIn(summary, readme)
+        self.assertIn(heading, readme)
+        self.assertIsNone(re.search(r"(?m)^## 每次 push", readme), "maintainer gate must not stay a top-level heading")
+        summary_at = readme.index(summary)
+        heading_at = readme.index(heading)
+        closing_at = readme.index("</details>", summary_at)
+        self.assertLess(summary_at, heading_at)
+        self.assertLess(heading_at, closing_at)
+        folded = readme[summary_at:closing_at]
+        for marker in (
+            "维护者每次 push 或发布前必须明确调用",
+            "MODE=RELEASE_GATE",
+            "./scripts/setup-hooks.sh",
+            "release_gate.py check",
+            "请为当前仓库执行一次真实的 push/发布门禁",
+            "#### github 智能体优化路线图",
+            "以下项目根据真实使用反馈分期推进",
+        ):
+            self.assertIn(marker, folded, marker)
+        self.assertLess(closing_at, readme.index(advanced_summary), "maintainer details must close before the advanced-install details")
 
     def test_validate_requires_docs_and_model_setup_in_checksums(self):
         workflow = self.package / ".github" / "workflows" / "validate.yml"
@@ -706,11 +732,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v3.1.0",
+            "tag=v3.1.1",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 3.1.0",
+            "同为 3.1.1",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -740,9 +766,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v3.1.0 --single-branch --depth 1",
+            "--branch v3.1.1 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `3.1.0`",
+            "同为 `3.1.1`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
