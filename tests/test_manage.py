@@ -482,13 +482,276 @@ class ManageTests(unittest.TestCase):
     def test_acceptance_agents_share_verdict_and_report_markers(self):
         for name in manage.ACCEPTANCE_AGENTS:
             text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
-            for marker in ("PASS", "BLOCK", "INCONCLUSIVE", manage.COMMON_ACCEPTANCE_MARKER):
+            report_marker = (
+                "report-id / role / requirement-version / snapshot(commit|source|artifact SHA|build-id) / generated-at"
+                if name == "shencha-content"
+                else manage.COMMON_ACCEPTANCE_MARKER
+            )
+            for marker in ("PASS", "BLOCK", "INCONCLUSIVE", report_marker):
                 self.assertIn(marker, text, name)
 
-    def test_content_review_has_five_profiles(self):
+    def test_content_review_editorial_v4_contract_markers(self):
         text = (self.package / "agents" / "shencha-content.md").read_text(encoding="utf-8")
-        for profile in ("seo", "conversion", "social", "email", "microcopy"):
-            self.assertIn("- `" + profile + "`：", text)
+        marker_groups = {
+            "profiles invalid fail closed": (
+                "非空去重集合",
+                "输入为空，或清洗非法/重复项后集合为空",
+                "未知 token",
+                "非法组合",
+                "case-study、research-report 必须含 `editorial`",
+                "CORE UNVERIFIED、INCONCLUSIVE、NO_GO",
+            ),
+            "QUICK no PASS": (
+                "即使全部已查项无缺陷",
+                "只能 BLOCK 或 INCONCLUSIVE",
+                "绝不得 PASS",
+                "`publication_decision=NO_GO`",
+            ),
+            "deterministic hash sampling": (
+                "稳定 section-id 与 claim type 分层",
+                'SHA256(snapshot-id + "|" + claim-id)',
+                "`ceil(20%)`",
+                "令目标数 `K=max(",
+                "UTF-8 字节序 `(hash, claim-id)`",
+                "先从每个含普通 claim 的实质章节选择该章普通 claim 全序第一项",
+                "再按普通 claim 全局全序补到 K",
+                "claim-id 必须非空且全局唯一",
+                "每条排序 hash",
+                "selected claim IDs",
+                "未抽范围",
+            ),
+            "batch Phase A and exact coverage": (
+                "`claim_count>40`",
+                "`>8000` 词",
+                "`>12000` 中文字",
+                "Phase A 只输出完整总 claim index",
+                "每个 part 最多 20 claims",
+                "`report-part-id`",
+                "无重复无遗漏",
+                "全部 claims 与全部 parts 做 100% 二审",
+                "零 finding 也不得豁免",
+                "无未达 VERIFIED 的 P0/P1",
+                "缺失、截断、无法解析",
+            ),
+            "status enums": (
+                "FINAL_CONTENT | DRAFT_DO_NOT_PUBLISH | DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED | BLOCKED",
+                "CONTENT_STATUS=FINAL_DRAFT | DRAFT_NATIVE_REVIEW_REQUIRED | NEEDS_INPUT | BLOCKED",
+                "SEND_STATUS=SEND_BLOCKED | READY_FOR_HUMAN_SEND_REVIEW",
+                "`DRAFT_DO_NOT_PUBLISH`、`DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED`",
+                "任一上游 `BLOCKED` => 对应 CORE FAIL、BLOCK、NO_GO",
+                "`SEND_BLOCKED` 不等于内容 CORE FAIL",
+                "`review_verdict` 与 `publication_decision`",
+            ),
+            "HIGH_RISK all-document independent retest": (
+                "无论长短、是否分批或是否有 finding",
+                "对同 snapshot 的全部 claims 做 100% 二审",
+                "`single-part/full-claim retest`",
+            ),
+            "P0/P1 fail closed": (
+                "任一 P0/P1 未达 VERIFIED",
+                "OPEN、READY_FOR_RETEST、ACCEPTED_RISK",
+                "P0/P1 禁止以 ACCEPTED_RISK 换取 GO",
+            ),
+            "independent retest": (
+                "不同全新会话且不得读取初审内部推理或未发布结论",
+                "不同审查 agent/model",
+                "具名人类编辑",
+                "原审查实例不得在同一会话关闭",
+                "保持 READY_FOR_RETEST",
+            ),
+            "report interface enums": (
+                "`PUBLISH | REWORK | SUPPLY_EVIDENCE | RUN_STANDARD_REVIEW | RUN_HIGH_RISK_REVIEW | NATIVE_REVIEW | INDEPENDENT_RETEST`",
+                "处于 OPEN 状态的 finding 工单 ID 数组",
+                "无 OPEN 工单时必须输出 `[]`",
+                "`publication_decision=GO` 时必须 `next_action=PUBLISH` 且 `open_ticket_ids=[]`",
+                "`next_action=RUN_STANDARD_REVIEW` 或 `RUN_HIGH_RISK_REVIEW`",
+            ),
+        }
+        for contract, markers in marker_groups.items():
+            for marker in markers:
+                self.assertIn(marker, text, contract)
+        self.assertNotIn("review_profile=seo|conversion|social|email|microcopy", text)
+        self.assertNotIn("rework_tickets", text)
+
+    def test_validate_rejects_missing_content_review_fail_closed_markers(self):
+        path = self.package / "agents" / "shencha-content.md"
+        original = path.read_text(encoding="utf-8")
+        for marker in (
+            "非法组合",
+            "绝不得 PASS",
+            'SHA256(snapshot-id + "|" + claim-id)',
+            "`claim_count>40`",
+            "Phase A 只输出完整总 claim index",
+            "零 finding 也不得豁免",
+            "无论长短、是否分批或是否有 finding",
+            "原审查实例不得在同一会话关闭",
+            "任一 P0/P1 未达 VERIFIED",
+        ):
+            with self.subTest(marker=marker):
+                path.write_text(original.replace(marker, "REMOVED_MARKER", 1), encoding="utf-8")
+                self.assert_validation_fails_with("missing role contract marker: {}".format(marker))
+                path.write_text(original, encoding="utf-8")
+
+    def test_validate_rejects_missing_upstream_status_enum_markers(self):
+        path = self.package / "agents" / "shencha-content.md"
+        original = path.read_text(encoding="utf-8")
+        for marker in ("SEND_BLOCKED", "READY_FOR_HUMAN_SEND_REVIEW", "FINAL_CONTENT", "FINAL_DRAFT"):
+            with self.subTest(marker=marker):
+                path.write_text(original.replace(marker, "REMOVED_MARKER"), encoding="utf-8")
+                self.assert_validation_fails_with("missing role contract marker: {}".format(marker))
+                path.write_text(original, encoding="utf-8")
+
+    def test_content_review_status_enums_match_upstream_agents(self):
+        reviewer = (self.package / "agents" / "shencha-content.md").read_text(encoding="utf-8")
+        sheyun = (self.package / "agents" / "sheyun.md").read_text(encoding="utf-8")
+        outreach = (self.package / "agents" / "outreach.md").read_text(encoding="utf-8")
+        expected_social = {
+            "FINAL_CONTENT",
+            "DRAFT_DO_NOT_PUBLISH",
+            "DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED",
+            "BLOCKED",
+        }
+        expected_email_content = {
+            "FINAL_DRAFT",
+            "DRAFT_NATIVE_REVIEW_REQUIRED",
+            "NEEDS_INPUT",
+            "BLOCKED",
+        }
+        expected_send = {"SEND_BLOCKED", "READY_FOR_HUMAN_SEND_REVIEW"}
+        for status in expected_social:
+            self.assertIn("`{}`".format(status), sheyun)
+            self.assertIn(status, reviewer)
+        for status in expected_email_content | expected_send:
+            self.assertIn("`{}`".format(status), outreach)
+            self.assertIn(status, reviewer)
+        social_contract = re.search(r"sheyun 的 `([^`]+)`", reviewer).group(1)
+        email_contract = re.search(r"CONTENT_STATUS=([^`]+)`，以及", reviewer).group(1)
+        send_contract = re.search(r"SEND_STATUS=([^`]+)`", reviewer).group(1)
+        self.assertEqual(set(social_contract.split(" | ")), expected_social)
+        self.assertEqual(set(email_contract.split(" | ")), expected_email_content)
+        self.assertEqual(set(send_contract.split(" | ")), expected_send)
+
+    def test_content_review_sampling_fixture_is_deterministic(self):
+        import hashlib
+        import math
+
+        snapshot = "snapshot-001"
+        claims = [
+            {"id": "C-01", "section": "S-1", "type": "fact"},
+            {"id": "C-02", "section": "S-1", "type": "promise"},
+            {"id": "C-03", "section": "S-2", "type": "fact"},
+            {"id": "C-04", "section": "S-2", "type": "fact"},
+            {"id": "C-05", "section": "S-3", "type": "opinion"},
+            {"id": "C-06", "section": "S-3", "type": "fact"},
+            {"id": "C-07", "section": "S-1", "type": "fact"},
+            {"id": "C-08", "section": "S-2", "type": "promise"},
+            {"id": "C-09", "section": "S-3", "type": "fact"},
+            {"id": "C-10", "section": "S-1", "type": "opinion"},
+        ]
+
+        def select(items):
+            ranked = sorted(
+                items,
+                key=lambda item: (
+                    hashlib.sha256((snapshot + "|" + item["id"]).encode("utf-8")).hexdigest().encode("utf-8"),
+                    item["id"].encode("utf-8"),
+                ),
+            )
+            sections = sorted({item["section"] for item in items})
+            target = max(math.ceil(len(items) * 0.2), min(3, len(items)), len(sections))
+            selected = []
+            for section in sections:
+                selected.append(next(item for item in ranked if item["section"] == section))
+            for item in ranked:
+                if item not in selected and len(selected) < target:
+                    selected.append(item)
+            return [item["id"] for item in selected]
+
+        first = select(claims)
+        self.assertEqual(first, select(list(reversed(claims))))
+        self.assertEqual(len(first), 3)
+        self.assertEqual({item["section"] for item in claims if item["id"] in first}, {"S-1", "S-2", "S-3"})
+
+    def test_content_review_metadata_is_hard_read_only(self):
+        text = (self.package / "agents" / "shencha-content.md").read_text(encoding="utf-8")
+        metadata = manage.parse_frontmatter(text)
+        self.assertTrue(manage.HARD_READ_ONLY_FORBIDDEN_TOOLS.isdisjoint(metadata["tools"]))
+        self.assertTrue(manage.HARD_READ_ONLY_FORBIDDEN_TOOLS.issubset(set(metadata["disallowedTools"])))
+
+    def test_validate_rejects_each_content_review_write_tool(self):
+        path = self.package / "agents" / "shencha-content.md"
+        original = path.read_text(encoding="utf-8")
+        tools_line = "tools: [Read, Glob, Grep, WebFetch, WebSearch, TodoWrite]"
+        for tool in sorted(manage.HARD_READ_ONLY_FORBIDDEN_TOOLS):
+            with self.subTest(tool=tool):
+                path.write_text(original.replace(tools_line, tools_line[:-1] + ", " + tool + "]", 1), encoding="utf-8")
+                self.assert_validation_fails_with("shencha-content tools must be strictly read-only")
+                path.write_text(original, encoding="utf-8")
+
+    def test_validate_rejects_content_review_missing_disallowed_write_tool(self):
+        path = self.package / "agents" / "shencha-content.md"
+        text = path.read_text(encoding="utf-8")
+        path.write_text(text.replace("disallowedTools: [Bash, Write, Edit]", "disallowedTools: [Bash, Write]", 1), encoding="utf-8")
+        self.assert_validation_fails_with("shencha-content disallowedTools must include Bash, Write, and Edit")
+
+    @staticmethod
+    def normalized_agent_body(data):
+        normalized = data.replace(b"\r\n", b"\n")
+        parts = normalized.split(b"---\n", 2)
+        if len(parts) != 3:
+            raise AssertionError("agent frontmatter delimiters are invalid")
+        return parts[2]
+
+    def test_published_changed_agent_bodies_match_release_fingerprints(self):
+        expected_hashes = {
+            "shencha-content": "9d41bf674043eaa4cee0f73b9b30f116be08fb873f0236d9291bb132ebf37cec",
+            "sheyun": "36550042f633917737df8d4f54d0c5c7c9fb95b66b36153e943fb3c4508375ed",
+        }
+        for name, expected_hash in expected_hashes.items():
+            published = (self.package / "agents" / (name + ".md")).read_bytes()
+            published_body = self.normalized_agent_body(published)
+            self.assertEqual(manage.sha256_bytes(published_body), expected_hash, name)
+
+    def test_changed_agent_body_parser_is_crlf_stable(self):
+        for name in ("shencha-content", "sheyun"):
+            published = (self.package / "agents" / (name + ".md")).read_bytes()
+            lf = published.replace(b"\r\n", b"\n")
+            crlf = lf.replace(b"\n", b"\r\n")
+            self.assertEqual(self.normalized_agent_body(crlf), self.normalized_agent_body(lf), name)
+
+    def test_local_changed_agent_sources_match_release_when_present(self):
+        for name in ("shencha-content", "sheyun"):
+            local_source = Path.home() / ".zcode" / "agents" / (name + ".md")
+            if not local_source.is_file():
+                self.skipTest("local source directory is unavailable")
+            published = (self.package / "agents" / (name + ".md")).read_bytes()
+            self.assertEqual(
+                self.normalized_agent_body(published),
+                self.normalized_agent_body(local_source.read_bytes()),
+                name,
+            )
+
+    def test_content_review_v4_docs_cover_examples_and_migration(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        protocol = (self.package / "INSTALL-FOR-AI.md").read_text(encoding="utf-8")
+        for marker in (
+            "review_profiles=[editorial,seo] review_tier=STANDARD",
+            "review_profiles=[conversion] review_tier=STANDARD",
+            "review_profiles=[editorial,seo] review_tier=HIGH_RISK",
+            "review_profiles=[social] review_tier=STANDARD",
+            "`QUICK` 永远是 `NO_GO`",
+            "agents/shencha-content.md",
+            "`sheyun` 与 `shencha-content`",
+        ):
+            self.assertIn(marker, readme)
+        for marker in (
+            "单值 `review_profile` 升级为集合 `review_profiles`",
+            "旧字段可临时映射为单元素集合",
+            "普通安装 state schema 不变",
+            "保留当前有效的本地 `model`/`thoughtLevel`",
+            "`sheyun` 与 `shencha-content`",
+        ):
+            self.assertIn(marker, protocol)
 
     def test_specialized_role_contract_markers(self):
         markers = {
@@ -732,11 +995,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v3.1.1",
+            "tag=v4.0.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 3.1.1",
+            "同为 4.0.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -766,9 +1029,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v3.1.1 --single-branch --depth 1",
+            "--branch v4.0.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `3.1.1`",
+            "同为 `4.0.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",

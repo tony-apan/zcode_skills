@@ -2,6 +2,26 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [4.0.0] — 2026-09-08
+
+### Breaking changes
+- `shencha-content` 的调用与报告主字段由单值 `review_profile` 升级为去重集合 `review_profiles`；旧字段进入 deprecated 兼容期，可临时映射为单元素集合，但新调用应迁移到 `review_profiles`。
+- 新增必填 `review_tier=QUICK|STANDARD|HIGH_RISK`。只有 `STANDARD` 或 `HIGH_RISK` 得到 `PASS` 才能输出 `publication_decision=GO`；`QUICK` 永远输出 `NO_GO`。
+
+### 新增
+- 新增可与 `seo`、`conversion` 等 profile 组合的 `editorial`，覆盖专业文章、白皮书、行业洞察、thought leadership、case study 与 research report 的论证结构、信息增量和编辑质量；profile 空集、未知 token、不适用组合或专业稿缺 `editorial` 均失败关闭为 CORE UNVERIFIED / INCONCLUSIVE / NO_GO。
+- 新增去重 claim ledger、`OBSERVED`/`VERIFIED_EXTERNAL` 等证据边界、分档覆盖率、publication GO/NO_GO、返工工单及 `READY_FOR_RETEST` 独立复测闭环；多语言高风险内容可进入 `PENDING_NATIVE_REVIEW`。
+
+### 双路审查修复
+- 修复 Terra P1：HIGH_RISK 长稿先 preflight；超过 40 claims、8000 词、12000 中文字或输出预算时强制 Phase A + 每 part 最多 20 claims，任一 part 缺失、截断、不可解析或 claim 覆盖不精确即 INCONCLUSIVE / NO_GO；无 finding 时也必须对同 snapshot 全部 claims/parts 独立二审。
+- 修复 Flash P2/P3：QUICK 禁止 PASS；STANDARD 使用 `(hash, claim-id)` 唯一全序、章节保底后全局补样到固定 K；按 sheyun/outreach 枚举固定映射上游状态；P0/P1 仅 VERIFIED 后可 GO；明确独立复测身份与材料边界；`shencha-content` frontmatter 硬禁止 Bash/Write/Edit，并新增关键协议与写工具负向门禁、CRLF 和确定性抽样复现测试。
+- 补非阻断审查改进：报告接口 `next_action` 固定为 `PUBLISH | REWORK | SUPPLY_EVIDENCE | RUN_STANDARD_REVIEW | RUN_HIGH_RISK_REVIEW | NATIVE_REVIEW | INDEPENDENT_RETEST` 枚举；`open_ticket_ids` 固定为处于 OPEN 状态的 finding 工单 ID 数组并取代重复字段 `rework_tickets`，`publication_decision=GO` 时必须 `next_action=PUBLISH` 且 `open_ticket_ids=[]`，`NO_GO` 按真实阻断原因取值；非法输入措辞改为“输入为空，或清洗非法/重复项后集合为空”；发布校验器新增 `FINAL_CONTENT`、`FINAL_DRAFT`、`SEND_BLOCKED`、`READY_FOR_HUMAN_SEND_REVIEW` 契约 marker 与逐枚举负向门禁测试；本地与发布版 `shencha-content` 正文保持一致。
+- `sheyun` 两处 deprecated `review_profile=social` 交审调用迁移为 `review_profiles=[social]`；P2/P3 可聚合展示，但不得丢失 claim ledger 证据索引或 finding 必填字段。
+
+### 兼容性与迁移
+- breaking 影响 `shencha-content` 的调用与报告字段，并同步迁移 `sheyun` 的交审调用；普通安装 state schema 不变。安装器更新 agent 正文时继续保留本地 `model`/`thoughtLevel` 和其他可合并的本地修改。
+- 本次 changed agents 为 `sheyun` 与 `shencha-content`，其他 18 个 `agents/*.md` 不变。回滚时可按现有 snapshot/rollback 流程恢复上一版 agent 正文与 state。
+
 ## [3.1.1] — 2026-09-07
 
 ### 优化

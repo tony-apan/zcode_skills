@@ -1,6 +1,6 @@
 {
   "name": "tony-agents-pack",
-  "description": "外贸 AI 员工团（ZCode 专用）：找客户、写开发信、做 SEO、运营社媒、盯友商、审内容、验网站、管仓库，20 个岗位持续新增；v3 强制每次推送前完成 GitHub 智能体发布审查，支持按本地已配置的模型自动适配安装（见 INSTALL-FOR-AI.md）。",
-  "version": "3.1.1",
+  "description": "外贸 AI 员工团（ZCode 专用）：找客户、写开发信、做 SEO、运营社媒、盯友商、专业编辑部内容门禁、验网站、管仓库，20 个岗位持续新增；v3 强制每次推送前完成 GitHub 智能体发布审查，支持按本地已配置的模型自动适配安装（见 INSTALL-FOR-AI.md）。",
+  "version": "4.0.0",
   "agents": "agents"
 }
