@@ -29,6 +29,8 @@ PUBLISHED_MODEL_NAME_RE = re.compile(r"(?i)\b(?:glm|gpt|deepseek|kimi|gemini)\b"
 INJECTION_DEFENSE_RE = re.compile(r"注入防御|不可信内容(?:与[^\n#]*)?防线|不可信内容|不可信数据|提示注入")
 COMMON_ACCEPTANCE_MARKER = "report-id / role / requirement-version / snapshot(commit/source/artifact SHA/build-id) / generated-at"
 ACCEPTANCE_AGENTS = {"shencha", "shencha-content", "shencha-ui", "verifier", "shencha-final"}
+HARD_READ_ONLY_AGENTS = {"github", "shencha-content"}
+HARD_READ_ONLY_FORBIDDEN_TOOLS = {"Bash", "Write", "Edit"}
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 KEY_RE = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:\s*(.*))?$")
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -390,15 +392,20 @@ def validate_package(verbose: bool = True) -> bool:
             if not INJECTION_DEFENSE_RE.search(text):
                 raise PackError("missing prompt-injection defense")
             if name in ACCEPTANCE_AGENTS:
-                for marker in ("PASS", "BLOCK", "INCONCLUSIVE", COMMON_ACCEPTANCE_MARKER):
+                report_marker = (
+                    "report-id / role / requirement-version / snapshot(commit|source|artifact SHA|build-id) / generated-at"
+                    if name == "shencha-content"
+                    else COMMON_ACCEPTANCE_MARKER
+                )
+                for marker in ("PASS", "BLOCK", "INCONCLUSIVE", report_marker):
                     if marker not in text:
                         raise PackError("missing acceptance marker: {}".format(marker))
+            if name in HARD_READ_ONLY_AGENTS:
+                if HARD_READ_ONLY_FORBIDDEN_TOOLS.intersection(metadata["tools"]):
+                    raise PackError("{} tools must be strictly read-only".format(name))
+                if not HARD_READ_ONLY_FORBIDDEN_TOOLS.issubset(set(metadata.get("disallowedTools", []))):
+                    raise PackError("{} disallowedTools must include Bash, Write, and Edit".format(name))
             if name == "github":
-                forbidden_tools = {"Bash", "Write", "Edit"}
-                if forbidden_tools.intersection(metadata["tools"]):
-                    raise PackError("github tools must be strictly read-only")
-                if not forbidden_tools.issubset(set(metadata.get("disallowedTools", []))):
-                    raise PackError("github disallowedTools must include Bash, Write, and Edit")
                 for marker in (
                     "REPO_REVIEW",
                     "README_POLISH",
@@ -433,7 +440,35 @@ def validate_package(verbose: bool = True) -> bool:
             role_markers = {
                 "frontend": ("## 模式", "可访问性", "截图"),
                 "mermaid": ("永远只输出一个 `mermaid` 代码块", "`graph TD`", "`click`", "集合"),
-                "shencha-content": ("review_profile=seo|conversion|social|email|microcopy",),
+                "shencha-content": (
+                    "editorial",
+                    "review_profiles",
+                    "review_tier",
+                    "QUICK",
+                    "STANDARD",
+                    "HIGH_RISK",
+                    "claim ledger",
+                    "publication_decision",
+                    "GO",
+                    "NO_GO",
+                    "OBSERVED",
+                    "VERIFIED_EXTERNAL",
+                    "READY_FOR_RETEST",
+                    "PENDING_NATIVE_REVIEW",
+                    "SEND_BLOCKED",
+                    "READY_FOR_HUMAN_SEND_REVIEW",
+                    "FINAL_CONTENT",
+                    "FINAL_DRAFT",
+                    "非法组合",
+                    "绝不得 PASS",
+                    'SHA256(snapshot-id + "|" + claim-id)',
+                    "`claim_count>40`",
+                    "Phase A 只输出完整总 claim index",
+                    "零 finding 也不得豁免",
+                    "无论长短、是否分批或是否有 finding",
+                    "原审查实例不得在同一会话关闭",
+                    "任一 P0/P1 未达 VERIFIED",
+                ),
                 "outreach": ("SEND_BLOCKED",),
                 "huoke": ("## 证据分类",),
                 "jiankong": ("pending",),

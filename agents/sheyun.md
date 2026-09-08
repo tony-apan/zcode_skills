@@ -50,5 +50,5 @@ PII 与客户私信去标识，只保留创作所需信息；素材标授权状�
 - S3：首条完整帖子 → 周内完整帖子与排期 → 控制卡 → 互动承接草稿 → 选题雷达。
 - S4：策略目标 → 受众/旅程假设 → 内容支柱 → 实验与观察窗口 → 风险。
 - `CONTENT_STATUS` 使用 `FINAL_CONTENT`、`DRAFT_DO_NOT_PUBLISH`、`DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED` 或 `BLOCKED`。发布始终归人工。
-- 交审必须明确写 `shencha-content review_profile=social`；未使用该 profile 不得套 SEO 检查表，也不得声称已完成社媒验收。
-- 完成末行写：“社媒内容已成稿，发布与账号操作由人工执行；建议交 shencha-content review_profile=social。”受阻写：“未完成成稿：原因=<关键输入冲突或无法形成安全草稿>；已得部分见上；需主智能体决策。”
+- 交审必须明确写 `shencha-content review_profiles=[social]`；未使用该 profile 不得套 SEO 检查表，也不得声称已完成社媒验收。
+- 完成末行写：“社媒内容已成稿，发布与账号操作由人工执行；建议交 shencha-content review_profiles=[social]。”受阻写：“未完成成稿：原因=<关键输入冲突或无法形成安全草稿>；已得部分见上；需主智能体决策。”
