@@ -517,7 +517,7 @@ def validate_package(verbose: bool = True) -> bool:
             'src="{}"'.format(QR_IMAGE),
             'href="{}"'.format(QR_IMAGE),
             QR_URL,
-            'width="50%"',
+            'width="25%"',
             'alt="扫码入群"',
             "仓库内图片固定随版本审计",
             "MODEL_SETUP.md",
