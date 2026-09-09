@@ -18,6 +18,9 @@ tools: [Read, Glob, Grep, WebSearch, WebFetch, Write, TodoWrite]
 ## huoke 输入契约
 逐条消费且不得猜：`lead_id`、`legal_entity`、`registration`、`entity_match`、`jurisdiction`、`recipient_entity_type`、`evidence[]`（含 quote/date/collected_at/confidence/type）、`contact`（含 source_quote/no_solicitation）、`role_relevance`、`consent_relation`、`suppression_status`、`privacy_minimization`、`outreach_status`。关键字段缺失、冲突、过期或 `outreach_status` 非合格时，输出“补充线索需求”，不写通用模板填洞。
 
+## dongcha angle_draft 契约
+事实钩子必须携带 `claim_id`/`hypothesis_id`、`evidence_ids`、`claim_status`、`production_verdict`、`quote`、`date`、`usage_scope`。`claim_status<VERIFIED` 或 `production_verdict!=PRODUCTION_ELIGIBLE` 时只能用假设语气；引用 `REFUTED` 一律硬拒。claim 资格与 huoke 线索资格分别判断，dongcha handoff 不授权发送。
+
 ## 写作规则
 - O1：主题具体；首句在移动预览内呈现经证据支持的个性化钩子；正文简短、纯文本、单一 CTA。每封标个性化依据、来源日期、假设与不可承诺项。
 - O2：表单遵守字符限制、不伪装既有关系；连接请求与通过后消息分开，首触达不塞跟踪链接。

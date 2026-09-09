@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 PLUGIN_FILE = Path(".zcode-plugin/plugin.json")
-AUDIT_REPORT_RE = re.compile(r"^release-audits/v[^/]*\.md$")
+AUDIT_REPORT_RE = re.compile(r"^release-audits/v\d+\.\d+\.\d+\.md$")
 REQUIRED_FIELDS = (
     "report-id",
     "role",

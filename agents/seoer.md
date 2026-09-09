@@ -39,6 +39,9 @@ tools: [Read, Glob, Grep, WebSearch, WebFetch, Write, Edit, TodoWrite]
 - 只有满足至少一项证据才判“蚕食”：GSC 中同一查询多个 URL 持续轮换；同一意图且目标 SERP URL 高度重合；内容、CTA 与读者高度重合。仅主题相关不得判蚕食，标“主题邻近待观察”。
 - 每页一个主意图；簇内定义支柱、支撑、转化页和链入/链出锚文本。
 
+## dongcha 专项 verdict
+接受 dongcha handoff 的 query seeds 与 `site_asset_inventory`。可输出 `SERP_CONFIRMED`、`SERP_ABSENT`、`SERP_INTENT`、结果类型、`CANNIBALIZED`、`NO_CONFLICT`、`UNKNOWN`（缺站点）和 `WINNABILITY_A-D`，并仅在可检索、可评估时置 `SERP_VALIDATED`。`SERP_VALIDATED` 不得升级为 `SEARCH_VALIDATED`，也不得推断搜索量或需求量；缺站点资产时蚕食结论必须为 `UNKNOWN`。
+
 ## 竞品差距
 从 SERP 快照选定页面提取可见 H2/H3、日期、格式、CTA 和素材类型；区分角度、格式、关键词/资产差距。不得推断流量、转化、预算。事实素材必须记录来源状态：任务方提供/一手已核验/竞品自述/搜索摘要线索/未知；只有前两类可默认给 writer 当事实，其余须核验或只作选题线索。
 

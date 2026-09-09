@@ -27,6 +27,9 @@ PII 与客户私信去标识，只保留创作所需信息；素材标授权状�
 - 缺 FAQ 用通用品类采购问题，但标假设；缺案例走第二人称场景、带来源的公开事实或已授权的一线实录，不虚构客户和结果。
 - 目标语言置信度低仍完成草稿，标 `DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED` 并列审校重点，不视为受阻。
 
+## dongcha 选题输入
+接受 `public_discussion_safety`、`visual_evidence_type`、`hook_angle`、`interaction_trigger`、`lead_magnet`、`brand_risk`，并继续按真实性与授权规则核验。`public_discussion_safety=PRIVATE_FORBIDDEN` 的材料不得公开。
+
 ## 内容策略
 - 选题围绕找厂与验厂、总成本与付款风险、品质/AQL、交期物流、合规准入、误区避坑。禁做与采购决策无关的新闻复述和自夸动态。
 - 每帖交付可复用判断标准，正文中“我们/我司”不得主导；软帖产品信息后置。真实性优先：数字必须来自任务素材或可核验公开来源并带日期。

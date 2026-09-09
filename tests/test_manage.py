@@ -704,8 +704,9 @@ class ManageTests(unittest.TestCase):
 
     def test_published_changed_agent_bodies_match_release_fingerprints(self):
         expected_hashes = {
-            "shencha-content": "9d41bf674043eaa4cee0f73b9b30f116be08fb873f0236d9291bb132ebf37cec",
-            "sheyun": "36550042f633917737df8d4f54d0c5c7c9fb95b66b36153e943fb3c4508375ed",
+            "dongcha": "5c1aa2b7b7a8f736334241cafa2fcac7e34592e108908753d6c0552437b881d2",
+            "shencha-content": "109a3e4b29d5b0571bff7c75b001eda2393a8ee5ce7158eea071e3b3105b67b3",
+            "sheyun": "e25a57d5c85c2eb69ac65dd1feec31fae29abf1fe5149a998e413f034d928af9",
         }
         for name, expected_hash in expected_hashes.items():
             published = (self.package / "agents" / (name + ".md")).read_bytes()
@@ -713,14 +714,14 @@ class ManageTests(unittest.TestCase):
             self.assertEqual(manage.sha256_bytes(published_body), expected_hash, name)
 
     def test_changed_agent_body_parser_is_crlf_stable(self):
-        for name in ("shencha-content", "sheyun"):
+        for name in ("dongcha", "shencha-content", "sheyun"):
             published = (self.package / "agents" / (name + ".md")).read_bytes()
             lf = published.replace(b"\r\n", b"\n")
             crlf = lf.replace(b"\n", b"\r\n")
             self.assertEqual(self.normalized_agent_body(crlf), self.normalized_agent_body(lf), name)
 
-    def test_local_changed_agent_sources_match_release_when_present(self):
-        for name in ("shencha-content", "sheyun"):
+    def test_local_demand_insight_agent_bodies_match_release(self):
+        for name in ("dongcha", "shencha-content", "shencha-final", "writer", "writer-pro"):
             local_source = Path.home() / ".zcode" / "agents" / (name + ".md")
             if not local_source.is_file():
                 self.skipTest("local source directory is unavailable")
@@ -730,6 +731,209 @@ class ManageTests(unittest.TestCase):
                 self.normalized_agent_body(local_source.read_bytes()),
                 name,
             )
+
+    def test_dongcha_published_contract_and_tool_boundary(self):
+        text = (self.package / "agents" / "dongcha.md").read_text(encoding="utf-8")
+        metadata = manage.parse_frontmatter(text)
+        self.assertEqual(manage.EXPECTED_AGENT_COUNT, 21)
+        self.assertNotIn("model", metadata)
+        self.assertNotIn("thoughtLevel", metadata)
+        self.assertNotIn("skills", metadata)
+        self.assertTrue({"Bash", "Edit"}.isdisjoint(metadata["tools"]))
+        self.assertIn("Write", metadata["tools"])
+        for marker in (
+            "VALIDATION_BACKLOG",
+            "claim_status",
+            "production_verdict",
+            "PRODUCTION_ELIGIBLE",
+            "E0_UNATTRIBUTED",
+            "E4_PRIMARY_OR_VERIFIABLE",
+            "SEARCH_VALIDATED",
+            "SERP_VALIDATED",
+            "QUERY_HYPOTHESIS",
+            "AI_PROMPT_VALIDATED",
+            "usable_as_fact",
+            "public_discussion_safety",
+            "origin_source_id",
+            "snapshot_id",
+            "只提议不授予",
+            "不可信内容防线",
+        ):
+            self.assertIn(marker, text)
+
+    def test_dongcha_review_grant_and_fact_consumer_markers(self):
+        markers = {
+            "shencha-content": (
+                "## dongcha claim 复核",
+                "review_profiles=[editorial]",
+                "APPROVE | CHANGES | REJECT",
+                "claim_status=VERIFIED",
+                "不得自行置 `production_verdict=PRODUCTION_ELIGIBLE`",
+                "不得改写证据等级",
+                "本节 `VERIFIED` 指 finding 关闭，不是 claim_status",
+            ),
+            "shencha-final": (
+                "## dongcha 生产资格授予",
+                "唯一可将 `production_verdict` 置为 `PRODUCTION_ELIGIBLE`",
+                "claim_status=VERIFIED",
+                "SEARCH_VALIDATED",
+                "SERP_VALIDATED",
+                "AI_PROMPT_",
+                "run 级重交 <=3",
+                "单 claim 审查 <=3",
+                "专项重验 <=2",
+                "conflict-id",
+            ),
+            "writer": (
+                "## dongcha 事实接口",
+                "usable_as_fact=Y",
+                "claim_status=VERIFIED",
+                "production_verdict=PRODUCTION_ELIGIBLE",
+                "usable_as_fact=N",
+                "claim_id",
+                "evidence_ids",
+            ),
+            "writer-pro": (
+                "## dongcha 事实接口",
+                "usable_as_fact=Y",
+                "claim_status=VERIFIED",
+                "production_verdict=PRODUCTION_ELIGIBLE",
+                "usable_as_fact=N",
+                "claim_id",
+                "evidence_ids",
+            ),
+        }
+        for name, required in markers.items():
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            for marker in required:
+                self.assertIn(marker, text, name)
+
+    def test_dongcha_round_limits_evidence_floor_and_namespace_markers(self):
+        text = (self.package / "agents" / "dongcha.md").read_text(encoding="utf-8")
+        for marker in (
+            "## 审查轮次上限",
+            "run 级重交 <=3",
+            "单 claim 审查 <=3",
+            "专项重验 <=2",
+            "差分再审",
+            "## claim_type 证据下限表",
+            "| claim_type | 允许 source_type 白名单 | 最小独立来源数 | 禁止替代 |",
+            "need_jtbd",
+            "不得用于搜索/行为类主张",
+            "AI_PROMPT_HYPOTHESIS",
+            "任何专项 verdict 不得升级 `claim_status` 或证据等级",
+            "唯一例外是 `SEARCH_VALIDATED` 仅由一方日志证据置位",
+        ):
+            self.assertIn(marker, text)
+
+    def test_validate_rejects_missing_demand_insight_contract_markers(self):
+        cases = {
+            "dongcha": ("## 审查轮次上限", "## claim_type 证据下限表"),
+            "shencha-content": ("## dongcha claim 复核",),
+            "shencha-final": ("## dongcha 生产资格授予", "production_verdict", "PRODUCTION_ELIGIBLE"),
+            "writer": ("## dongcha 事实接口", "usable_as_fact"),
+            "writer-pro": ("## dongcha 事实接口", "usable_as_fact"),
+        }
+        for name, markers in cases.items():
+            path = self.package / "agents" / (name + ".md")
+            original = path.read_text(encoding="utf-8")
+            for marker in markers:
+                with self.subTest(name=name, marker=marker):
+                    path.write_text(original.replace(marker, "REMOVED_MARKER"), encoding="utf-8")
+                    self.assert_validation_fails_with("missing role contract marker: {}".format(marker))
+                    path.write_text(original, encoding="utf-8")
+
+    def test_validate_rejects_each_dongcha_claim_type_table_row_removal(self):
+        path = self.package / "agents" / "dongcha.md"
+        original = path.read_text(encoding="utf-8")
+        row_starts = (
+            "| `pain` |",
+            "| `need_jtbd` |",
+            "| `search_behavior` |",
+            "| `ai_prompt_behavior` |",
+            "| `buying_behavior` |",
+            "| `transaction` |",
+        )
+        for row in row_starts:
+            with self.subTest(row=row):
+                self.assertIn(row, original)
+                stripped = "\n".join(line for line in original.splitlines() if not line.startswith(row))
+                self.assertNotEqual(stripped, original.rstrip("\n"))
+                path.write_text(stripped + "\n", encoding="utf-8")
+                self.assert_validation_fails_with("missing role contract marker: {}".format(row))
+                path.write_text(original, encoding="utf-8")
+
+    def test_validate_rejects_dongcha_claim_type_header_and_need_jtbd_substitute_tampering(self):
+        path = self.package / "agents" / "dongcha.md"
+        original = path.read_text(encoding="utf-8")
+        header = "| claim_type | 允许 source_type 白名单 | 最小独立来源数 | 禁止替代 |"
+        need_jtbd_substitute = "不得以改标 `need_jtbd` 绕过 `search_behavior`/`buying_behavior` 下限"
+        for marker, tampered in (
+            (header, "| claim_type | 来源 | 数量 | 备注 |"),
+            (need_jtbd_substitute, "允许以改标 `need_jtbd` 绕过证据下限"),
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, original)
+                path.write_text(original.replace(marker, tampered, 1), encoding="utf-8")
+                self.assert_validation_fails_with("missing role contract marker: {}".format(marker))
+                path.write_text(original, encoding="utf-8")
+
+    def test_validate_rejects_dongcha_production_eligible_invariant_removal(self):
+        path = self.package / "agents" / "dongcha.md"
+        original = path.read_text(encoding="utf-8")
+        implication = "=> claim_status=VERIFIED ∧ claim_type 证据下限满足 ∧ 无未决冲突 ∧ freshness 通过"
+        invariant_block = "production_verdict=PRODUCTION_ELIGIBLE\n" + implication
+        self.assertIn(invariant_block, original)
+        for removal in (implication + "\n", invariant_block + "\n"):
+            with self.subTest(removal=removal.splitlines()[0]):
+                path.write_text(original.replace(removal, "", 1), encoding="utf-8")
+                self.assert_validation_fails_with("missing role contract marker: {}".format(implication))
+                path.write_text(original, encoding="utf-8")
+
+    def test_readme_marks_eight_existing_agents_and_three_tier_round_limits(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("九个既有 agent", readme)
+        self.assertIn("八个既有 agent", readme)
+        self.assertIn("run 级重交 ≤3", readme)
+        self.assertIn("单 claim 审查 ≤3", readme)
+        self.assertIn("专项重验 ≤2", readme)
+
+    def test_validate_rejects_production_eligible_in_dongcha_claim_status_enum(self):
+        path = self.package / "agents" / "dongcha.md"
+        original = path.read_text(encoding="utf-8")
+        path.write_text(
+            original.replace(
+                "claim_status:      DRAFT -> EVIDENCE_COLLECTED -> VERIFIED -> EXPIRED | SUPERSEDED | REJECTED",
+                "claim_status:      DRAFT -> EVIDENCE_COLLECTED -> VERIFIED -> PRODUCTION_ELIGIBLE -> EXPIRED | SUPERSEDED | REJECTED",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        self.assert_validation_fails_with("dongcha claim_status enum must not contain PRODUCTION_ELIGIBLE")
+
+    def test_dongcha_specialized_handoff_markers(self):
+        markers = {
+            "seoer": ("SERP_CONFIRMED", "SERP_ABSENT", "SERP_INTENT", "CANNIBALIZED", "NO_CONFLICT", "WINNABILITY_A-D", "SERP_VALIDATED", "SEARCH_VALIDATED", "site_asset_inventory"),
+            "huoke": ("FIT=True", "N1 边界反例", "N2 匹配但不买", "N3 与 >=E3 来源冲突", "REFUTED"),
+            "outreach": ("claim_id", "hypothesis_id", "evidence_ids", "claim_status<VERIFIED", "production_verdict!=PRODUCTION_ELIGIBLE", "usage_scope", "REFUTED"),
+            "sheyun": ("public_discussion_safety", "visual_evidence_type", "hook_angle", "interaction_trigger", "lead_magnet", "brand_risk", "PRIVATE_FORBIDDEN"),
+        }
+        for name, required in markers.items():
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            for marker in required:
+                self.assertIn(marker, text, name)
+
+    def test_validate_rejects_dongcha_forbidden_tools_and_missing_write(self):
+        path = self.package / "agents" / "dongcha.md"
+        original = path.read_text(encoding="utf-8")
+        tools_line = "tools: [Read, Glob, Grep, WebSearch, WebFetch, Write, TodoWrite]"
+        for tool in ("Bash", "Edit"):
+            with self.subTest(tool=tool):
+                path.write_text(original.replace(tools_line, tools_line[:-1] + ", " + tool + "]", 1), encoding="utf-8")
+                self.assert_validation_fails_with("dongcha tools must not include Bash or Edit")
+                path.write_text(original, encoding="utf-8")
+        path.write_text(original.replace(", Write", "", 1), encoding="utf-8")
+        self.assert_validation_fails_with("dongcha tools must include Write")
 
     def test_content_review_v4_docs_cover_examples_and_migration(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
@@ -741,17 +945,26 @@ class ManageTests(unittest.TestCase):
             "review_profiles=[social] review_tier=STANDARD",
             "`QUICK` 永远是 `NO_GO`",
             "agents/shencha-content.md",
-            "`sheyun` 与 `shencha-content`",
+            "需求洞察与证据门禁",
+            "L1 PUBLIC_EVIDENCE",
+            "L2 FIRST_PARTY_RESEARCH",
         ):
             self.assertIn(marker, readme)
         for marker in (
-            "单值 `review_profile` 升级为集合 `review_profiles`",
-            "旧字段可临时映射为单元素集合",
+            "普通用户直接执行 update 即可",
             "普通安装 state schema 不变",
-            "保留当前有效的本地 `model`/`thoughtLevel`",
-            "`sheyun` 与 `shencha-content`",
+            "默认保留现有 agent 的本地 `model`/`thoughtLevel`",
+            "新增 `dongcha`",
+            "更新 `seoer`、`writer`、`writer-pro`、`huoke`、`sheyun`、`outreach`",
+            "`shencha-content` 的 claim 复核",
+            "`shencha-final` 的生产资格授予",
         ):
             self.assertIn(marker, protocol)
+        for marker in (
+            "下游 `seoer`、`writer`、`writer-pro`、`huoke`、`sheyun`、`outreach`",
+            "最终由 `shencha-final` 授予 `PRODUCTION_ELIGIBLE`",
+        ):
+            self.assertIn(marker, readme)
 
     def test_specialized_role_contract_markers(self):
         markers = {
@@ -916,6 +1129,10 @@ class ManageTests(unittest.TestCase):
             text = (self.package / filename).read_text(encoding="utf-8")
             self.assertIn("ZCode 专用", text, filename)
 
+    def test_release_version_is_v4_1_0(self):
+        plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        self.assertEqual(plugin["version"], "4.1.0")
+
     def test_release_version_matches_latest_changelog(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
         changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -995,11 +1212,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v4.0.0",
+            "tag=v4.1.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 4.0.0",
+            "同为 4.1.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -1029,9 +1246,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v4.0.0 --single-branch --depth 1",
+            "--branch v4.1.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `4.0.0`",
+            "同为 `4.1.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",

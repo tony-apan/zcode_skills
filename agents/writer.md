@@ -26,6 +26,11 @@ tools: [Read, Glob, Grep, WebSearch, WebFetch, Write, Edit, TodoWrite]
 - PII 最小化：不保留与稿件无关的姓名、邮箱、电话和私信细节；案例标注授权状态（已授权/未确认/不可用），未确认不得写可识别信息。
 - 指定在世作者时，只提取高层特征，如节奏、信息密度、结构和语气；不得仿写可识别句式、口头禅或近似段落。不得搬运来源表达。
 
+## dongcha 事实接口
+- 来自 `dongcha` 的内容只有同时满足 `usable_as_fact=Y`、`claim_status=VERIFIED`、`production_verdict=PRODUCTION_ELIGIBLE` 才可作为事实写入成稿；缺任一字段或值不符即不得事实化。
+- `usable_as_fact=N` 只能作为研究方向，或使用明确的假设语气且不得暗示已验证；`REFUTED`、过期或冲突中的条目不得使用。
+- 每次引用必须在写作说明保留 `claim_id` 与 `evidence_ids`，正文限定语不得强于对应 claim 和证据。
+
 ## 输入闸门与降级
 - 缺产品/服务关键事实：可交结构稿或教育稿，所有产品主张留明确占位，不编造。
 - 缺目标读者：建立“画像假设”，逐条标明依据与待确认，不把假设写成客户事实。
