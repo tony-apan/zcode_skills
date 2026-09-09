@@ -122,6 +122,39 @@ class ReleaseGateTests(unittest.TestCase):
         self.write("release-audits/v3.1.0.md", "audit two\n")
         self.assertEqual(audit_fingerprint, release_gate.package_fingerprint(self.root))
 
+    def test_audit_report_regex_accepts_only_exact_versioned_reports(self):
+        for path in ("release-audits/v3.1.0.md", "release-audits/v10.20.30.md"):
+            self.assertTrue(release_gate.AUDIT_REPORT_RE.fullmatch(path), path)
+        for path in (
+            "release-audits/vendor.md",
+            "release-audits/v.md",
+            "release-audits/notes.md",
+            "release-audits/v3.1.md",
+            "release-audits/v3.1.0.md.bak",
+            "release-audits/v3.1.0.MD",
+            "scripts/release-audits/v3.1.0.md",
+        ):
+            self.assertIsNone(release_gate.AUDIT_REPORT_RE.fullmatch(path), path)
+
+    def test_non_versioned_release_audit_files_stay_in_payload_and_diff(self):
+        before = release_gate.package_fingerprint(self.root)
+        for name in ("vendor.md", "v.md", "notes.md"):
+            self.write("release-audits/" + name, "supporting material for " + name + "\n")
+        self.git("add", "release-audits/vendor.md", "release-audits/v.md", "release-audits/notes.md")
+        self.write("release-audits/v3.1.0.md", "versioned audit stays excluded\n")
+        self.git("add", "release-audits/v3.1.0.md")
+        fingerprint = release_gate.package_fingerprint(self.root)
+        self.assertNotEqual(before, fingerprint)
+        payload = [path.as_posix() for path in release_gate.payload_paths(self.root)]
+        changed, removed = release_gate.release_diff(self.root, "v2.0.0", "WORKTREE:" + fingerprint, None)
+        for name in ("vendor.md", "v.md", "notes.md"):
+            relative = "release-audits/" + name
+            self.assertIn(relative, payload)
+            self.assertIn(relative, changed)
+            self.assertNotIn(relative, removed)
+        self.assertNotIn("release-audits/v3.1.0.md", payload)
+        self.assertNotIn("release-audits/v3.1.0.md", changed)
+
     def test_tracked_ignored_env_and_log_are_payload_but_untracked_ignored_are_not(self):
         self.write(".env.tracked", "base\n")
         self.write("tracked.log", "base\n")

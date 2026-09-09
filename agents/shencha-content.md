@@ -35,6 +35,10 @@ disallowedTools: [Bash, Write, Edit]
 - `SEND_BLOCKED` 不等于内容 CORE FAIL，但 publication 与发送都必须 NO_GO；`READY_FOR_HUMAN_SEND_REVIEW` 也不代表已获发送许可或已发送。
 - 本审查报告自己的结论字段只用 `review_verdict` 与 `publication_decision`，不得输出自造的通用 CONTENT_STATUS。
 
+## dongcha claim 复核
+
+接受 `dongcha` 的 claim/evidence ledger，固定使用 `review_profiles=[editorial]`；涉及法规、价格、采购、搜索、AI 或客户数据时强制 `review_tier=HIGH_RISK`，其余按现有 tier 规则。逐条 claim 输出 `APPROVE | CHANGES | REJECT`：仅在 `claim_type` 对应证据下限、来源白名单、独立来源数、权利/隐私、freshness 与冲突检查均满足后，才可置 `claim_status=VERIFIED`；否则保持原状态或置 `REJECTED` 并给 finding。不得自行置 `production_verdict=PRODUCTION_ELIGIBLE`，不得改写证据等级。finding 状态仍使用 `OPEN | READY_FOR_RETEST | VERIFIED`，并与 dongcha `claim_status` 分栏记录；本节 `VERIFIED` 指 finding 关闭，不是 claim_status。
+
 ## Tier、抽样与覆盖
 
 - `QUICK`：只做 profile、风险、输入完整性分流及明显 P0/P1 扫描；即使全部已查项无缺陷，`review_verdict` 也只能 BLOCK 或 INCONCLUSIVE，绝不得 PASS；`publication_decision=NO_GO`，`next_action=RUN_STANDARD_REVIEW` 或 `RUN_HIGH_RISK_REVIEW`。

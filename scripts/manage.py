@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
 PLUGIN_FILE = ROOT / ".zcode-plugin" / "plugin.json"
 PACKAGE_NAME = "tony-agents-pack"
-EXPECTED_AGENT_COUNT = 20
+EXPECTED_AGENT_COUNT = 21
 COLORS = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
 TOOLS = {"Read", "Glob", "Grep", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "TodoWrite"}
 FORBIDDEN_PUBLISHED_KEYS = {"model", "thoughtLevel", "skills"}
@@ -405,6 +405,16 @@ def validate_package(verbose: bool = True) -> bool:
                     raise PackError("{} tools must be strictly read-only".format(name))
                 if not HARD_READ_ONLY_FORBIDDEN_TOOLS.issubset(set(metadata.get("disallowedTools", []))):
                     raise PackError("{} disallowedTools must include Bash, Write, and Edit".format(name))
+            if name == "dongcha":
+                dongcha_tools = set(metadata["tools"])
+                if {"Bash", "Edit"}.intersection(dongcha_tools):
+                    raise PackError("dongcha tools must not include Bash or Edit")
+                if "Write" not in dongcha_tools:
+                    raise PackError("dongcha tools must include Write")
+                _, dongcha_body = frontmatter_parts(text)
+                claim_status_lines = re.findall(r"(?m)^claim_status:\s*(.+)$", "".join(dongcha_body))
+                if any("PRODUCTION_ELIGIBLE" in line for line in claim_status_lines):
+                    raise PackError("dongcha claim_status enum must not contain PRODUCTION_ELIGIBLE")
             if name == "github":
                 for marker in (
                     "REPO_REVIEW",
@@ -444,6 +454,7 @@ def validate_package(verbose: bool = True) -> bool:
                     "editorial",
                     "review_profiles",
                     "review_tier",
+                    "## dongcha claim 复核",
                     "QUICK",
                     "STANDARD",
                     "HIGH_RISK",
@@ -469,8 +480,86 @@ def validate_package(verbose: bool = True) -> bool:
                     "原审查实例不得在同一会话关闭",
                     "任一 P0/P1 未达 VERIFIED",
                 ),
-                "outreach": ("SEND_BLOCKED",),
-                "huoke": ("## 证据分类",),
+                "writer": (
+                    "## dongcha 事实接口",
+                    "usable_as_fact",
+                ),
+                "writer-pro": (
+                    "## dongcha 事实接口",
+                    "usable_as_fact",
+                ),
+                "shencha-final": (
+                    "## dongcha 生产资格授予",
+                    "production_verdict",
+                    "PRODUCTION_ELIGIBLE",
+                ),
+                "outreach": (
+                    "SEND_BLOCKED",
+                    "## dongcha angle_draft 契约",
+                    "claim_status<VERIFIED",
+                    "production_verdict!=PRODUCTION_ELIGIBLE",
+                    "usage_scope",
+                    "REFUTED",
+                ),
+                "huoke": (
+                    "## 证据分类",
+                    "## dongcha ICP 验证",
+                    "FIT=True",
+                    "N1 边界反例",
+                    "N2 匹配但不买",
+                    "N3 与 >=E3 来源冲突",
+                ),
+                "seoer": (
+                    "## dongcha 专项 verdict",
+                    "SERP_CONFIRMED",
+                    "SERP_ABSENT",
+                    "SERP_INTENT",
+                    "CANNIBALIZED",
+                    "NO_CONFLICT",
+                    "WINNABILITY_A-D",
+                    "SERP_VALIDATED",
+                    "SEARCH_VALIDATED",
+                    "site_asset_inventory",
+                ),
+                "sheyun": (
+                    "## dongcha 选题输入",
+                    "public_discussion_safety",
+                    "visual_evidence_type",
+                    "hook_angle",
+                    "interaction_trigger",
+                    "lead_magnet",
+                    "brand_risk",
+                    "PRIVATE_FORBIDDEN",
+                ),
+                "dongcha": (
+                    "VALIDATION_BACKLOG",
+                    "claim_status",
+                    "production_verdict",
+                    "PRODUCTION_ELIGIBLE",
+                    "E0_UNATTRIBUTED",
+                    "E4_PRIMARY_OR_VERIFIABLE",
+                    "SEARCH_VALIDATED",
+                    "SERP_VALIDATED",
+                    "QUERY_HYPOTHESIS",
+                    "AI_PROMPT_VALIDATED",
+                    "usable_as_fact",
+                    "public_discussion_safety",
+                    "origin_source_id",
+                    "snapshot_id",
+                    "只提议不授予",
+                    "## 审查轮次上限",
+                    "## claim_type 证据下限表",
+                    "| claim_type | 允许 source_type 白名单 | 最小独立来源数 | 禁止替代 |",
+                    "| `pain` |",
+                    "| `need_jtbd` |",
+                    "| `search_behavior` |",
+                    "| `ai_prompt_behavior` |",
+                    "| `buying_behavior` |",
+                    "| `transaction` |",
+                    "不得以改标 `need_jtbd` 绕过 `search_behavior`/`buying_behavior` 下限",
+                    "=> claim_status=VERIFIED ∧ claim_type 证据下限满足 ∧ 无未决冲突 ∧ freshness 通过",
+                    "不可信内容防线",
+                ),
                 "jiankong": ("pending",),
                 "tijian": ("ACTIVE_SECURITY",),
                 "coder-ds": ("MODE=PARALLEL_ALTERNATIVE", "MODE=OVERFLOW"),

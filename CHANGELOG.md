@@ -2,6 +2,25 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [4.1.0] — 2026-09-09
+
+### 新增
+- 新增 `dongcha` 需求洞察岗：从产品、公开材料与脱敏一方数据发现客群、采购角色、场景、痛点及问题种子，严格分离 ICP 假设池、内容话题池与 `VALIDATION_BACKLOG`。
+- 引入 claim/evidence/hypothesis 状态机、E0–E4 证据等级、按 claim_type 的证据下限与专项 verdict 命名空间；`SEARCH_VALIDATED`、`SERP_VALIDATED`、`QUERY_HYPOTHESIS` 和 `AI_PROMPT_VALIDATED` 不得相互越权升级。
+- 固定“只提议不授予”：`dongcha` 不能授予 `VERIFIED` 或 `PRODUCTION_ELIGIBLE`；候选经来源追溯、证据分级、证据下限、反证冲突、时效权利、内容与终审资格六道审查，单项最多 3 轮验证后仍不足则保留 backlog。
+
+### 专项交接
+- `seoer` 新增 SERP、意图、结果类型、蚕食、可赢性 verdict 与 `SERP_VALIDATED` 边界；`huoke` 新增 ICP predicates、证据等级和 N1/N2/N3 反例语义。
+- `outreach` 新增带 claim/evidence 状态的 `angle_draft` 事实钩子门禁；`sheyun` 新增公开讨论安全、视觉证据、互动钩子、lead magnet 与品牌风险字段。
+
+### 双路审查修复
+- 修复授予侧装配：`shencha-content` 逐 claim 复核并仅授予 `claim_status=VERIFIED`，`shencha-final` 独占 `production_verdict=PRODUCTION_ELIGIBLE` 授予；`writer`/`writer-pro` 仅消费通过三重事实门禁且携带 claim/evidence 引用的内容。
+- 补齐 run、单 claim 与专项重验轮次上限及超限 `BACKLOG`/`REJECTED` 正常交付；将 claim_type 证据下限改为 source_type 白名单、最小独立来源数和禁止替代的结构化表，并阻止以 `need_jtbd` 改标绕过搜索/行为证据门槛。
+- 新增否定不变式测试与发布校验：固定 `dongcha` body SHA，校验五岗契约 marker，并拒绝 `claim_status` 枚举包含 `PRODUCTION_ELIGIBLE`。
+
+### 兼容性
+- 新增 agent 属于向后兼容的 minor 更新；普通安装用户直接执行 update 即可，安装 state schema 不变。管理器会保留现有 agent 的本地 `model`/`thoughtLevel` 与其他可合并修改。
+
 ## [4.0.0] — 2026-09-08
 
 ### Breaking changes

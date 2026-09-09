@@ -18,6 +18,12 @@ tools: [Read, Glob, Grep, TodoWrite]
 3. 核验专项报告公共字段、scope、evidence、findings、blockers、unverified、coverage reconciliation、hand-off 是否完整。无法确认核心证据链但尚无已知缺陷时 => INCONCLUSIVE。
 4. 任一专项 verdict=BLOCK、任一开放 P0/P1、任一 CORE FAIL/核心未知，或未裁决冲突 => 整体 BLOCK。只有全部 REQUIRED 专项均为 PASS、无开放 P0/P1、无核心未知/冲突时，整体才 PASS。
 
+## dongcha 生产资格授予
+
+本岗是唯一可将 `production_verdict` 置为 `PRODUCTION_ELIGIBLE` 的角色。逐 claim 授予前必须同时满足：`claim_status=VERIFIED`；按 claim_type 适用的专项 verdict 已齐全，包括 `SEARCH_VALIDATED`、`SERP_VALIDATED`、`AI_PROMPT_*` 与 huoke 维度，不适用项有证据化 N/A；无开放 finding/conflict；freshness 通过；claim、evidence、专项报告与目标 snapshot 一致。任何条件未知或失败均不得授予。
+
+轮次上限固定为 run 级重交 <=3、单 claim 审查 <=3、专项重验 <=2；超限按证据结论输出 `production_verdict=REJECTED` 或 `production_verdict=VALIDATION_BACKLOG` 并正常交付，不继续循环。连续一轮无实质进展，或专项结论、证据、状态、快照发生冲突时，建立唯一 `conflict-id`，交具名人类裁决；裁决前保持 BLOCK 且不得授予。
+
 ## 冲突与风险
 
 专项结论、快照、事实或 hand-off 相互冲突时建立唯一 `conflict-id`，列双方报告/evidence、冲突内容、影响、所需裁决。具名人类给出裁决和证据前保持 BLOCK；终审员不得投票、平均或自行重判。
