@@ -120,7 +120,7 @@ upgrade: <guidance of at least 20 characters>
 |---|---|---|
 | <named owner> | <action> | <READY|COMPLETE|UNAFFECTED> |
 
-九个二级 heading 必须精确按上述顺序出现，不得缺少、乱序或增加其他二级 heading；一级标题可以保留。`Scope` 必须逐项用代码格式列出每个 `changed_files`/`removed_files` 路径和 `changed_agents` 名称；空集合分别写 `changed_files: none`、`removed_files: none`、`changed_agents: none`。三组集合须来自 Git 发布 payload 的真实 diff：Git 仓库中的 payload 只包括 tracked 与非 ignored untracked，版本 audit `release-audits/v*.md` 排除但 `release-audits/README.md` 等治理文件参与；tracked `.env`/log 参与，ignored 且 untracked 的本地文件不参与。不得凭调用方输入照抄。
+九个二级 heading 必须精确按上述顺序出现，不得缺少、乱序或增加其他二级 heading；一级标题可以保留。`Scope` 必须逐项用代码格式列出每个 `changed_files`/`removed_files` 路径和 `changed_agents` 名称；空集合分别写 `changed_files: none`、`removed_files: none`、`changed_agents: none`。三组集合须来自 Git 发布 payload 的真实 diff：Git 仓库中的 payload 只包括 tracked 与非 ignored untracked，版本 audit（精确名 `release-audits/v<major>.<minor>.<patch>.md`，如 `v4.2.0.md`）排除但 `release-audits/README.md` 等治理文件参与；tracked `.env`/log 参与，ignored 且 untracked 的本地文件不参与。不得凭调用方输入照抄。
 
 `Evidence` 固定表头 `| evidence-id | check | result | evidence |`，至少包含 check 为 validation/tests/fingerprint 且 result=PASS 的三行。`Findings` 只能是单独 `none` 或表头 `| finding-id | severity | status | summary |`；severity 仅 P0-P3，status 仅 OPEN/FIXED/ACCEPTED_RISK，PASS 时 P0/P1 必须 FIXED，开放 P2/P3 必须在 Improvements 或 Hand-off 引用 ID。`Agent Links` 只列准确版本化 URL bullet；无 agent 变更写 `none — no agent contract changes`。
 

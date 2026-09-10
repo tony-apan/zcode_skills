@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
 PLUGIN_FILE = ROOT / ".zcode-plugin" / "plugin.json"
 PACKAGE_NAME = "tony-agents-pack"
-EXPECTED_AGENT_COUNT = 21
+EXPECTED_AGENT_COUNT = 22
 COLORS = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
 TOOLS = {"Read", "Glob", "Grep", "Write", "Edit", "Bash", "WebFetch", "WebSearch", "TodoWrite"}
 FORBIDDEN_PUBLISHED_KEYS = {"model", "thoughtLevel", "skills"}
@@ -448,7 +448,26 @@ def validate_package(verbose: bool = True) -> bool:
                     if marker not in text:
                         raise PackError("missing github release-gate marker: {}".format(marker))
             role_markers = {
-                "frontend": ("## 模式", "可访问性", "截图"),
+                "frontend": ("## 模式", "可访问性", "截图", "## 界面文案（微文案）", "[文案待确认"),
+                "gonghao": (
+                    "## 模式",
+                    "G1 单篇",
+                    "G2 系列",
+                    "G3 周运营",
+                    "G4 纯策略",
+                    "## 平台规则与合规（公众号特有）",
+                    "诱导分享",
+                    "诱导关注",
+                    "绝对化用语",
+                    "原创声明",
+                    "留言区",
+                    "review_profiles=[editorial,social]",
+                    "CONTENT_STATUS",
+                    "FINAL_CONTENT",
+                    "DRAFT_DO_NOT_PUBLISH",
+                    "DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED",
+                    "BLOCKED",
+                ),
                 "mermaid": ("永远只输出一个 `mermaid` 代码块", "`graph TD`", "`click`", "集合"),
                 "shencha-content": (
                     "editorial",

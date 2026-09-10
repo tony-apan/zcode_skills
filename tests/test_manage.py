@@ -624,7 +624,9 @@ class ManageTests(unittest.TestCase):
         for status in expected_email_content | expected_send:
             self.assertIn("`{}`".format(status), outreach)
             self.assertIn(status, reviewer)
-        social_contract = re.search(r"sheyun 的 `([^`]+)`", reviewer).group(1)
+        self.assertIn("`gonghao`（公众号长文）", reviewer)
+        self.assertIn("upstream_agent", reviewer)
+        social_contract = re.search(r"同一组状态值 `([^`]+)`", reviewer).group(1)
         email_contract = re.search(r"CONTENT_STATUS=([^`]+)`，以及", reviewer).group(1)
         send_contract = re.search(r"SEND_STATUS=([^`]+)`", reviewer).group(1)
         self.assertEqual(set(social_contract.split(" | ")), expected_social)
@@ -705,8 +707,8 @@ class ManageTests(unittest.TestCase):
     def test_published_changed_agent_bodies_match_release_fingerprints(self):
         expected_hashes = {
             "dongcha": "5c1aa2b7b7a8f736334241cafa2fcac7e34592e108908753d6c0552437b881d2",
-            "shencha-content": "109a3e4b29d5b0571bff7c75b001eda2393a8ee5ce7158eea071e3b3105b67b3",
-            "sheyun": "e25a57d5c85c2eb69ac65dd1feec31fae29abf1fe5149a998e413f034d928af9",
+            "shencha-content": "ab2ceacdc7910c5f1178d489fa80deba0f4ecdd083a47b1fc26ca876ed66660c",
+            "sheyun": "cd5649dacb0832515e328d0513d68a1c7b777988e78420d523d8fe75745eeeb3",
         }
         for name, expected_hash in expected_hashes.items():
             published = (self.package / "agents" / (name + ".md")).read_bytes()
@@ -720,22 +722,194 @@ class ManageTests(unittest.TestCase):
             crlf = lf.replace(b"\n", b"\r\n")
             self.assertEqual(self.normalized_agent_body(crlf), self.normalized_agent_body(lf), name)
 
-    def test_local_demand_insight_agent_bodies_match_release(self):
-        for name in ("dongcha", "shencha-content", "shencha-final", "writer", "writer-pro"):
-            local_source = Path.home() / ".zcode" / "agents" / (name + ".md")
-            if not local_source.is_file():
-                self.skipTest("local source directory is unavailable")
-            published = (self.package / "agents" / (name + ".md")).read_bytes()
-            self.assertEqual(
-                self.normalized_agent_body(published),
-                self.normalized_agent_body(local_source.read_bytes()),
-                name,
-            )
+    def test_local_agent_bodies_match_release_for_every_agent(self):
+        names = sorted(p.name for p in (self.package / "agents").glob("*.md"))
+        self.assertEqual(len(names), manage.EXPECTED_AGENT_COUNT)
+        local_dir = Path.home() / ".zcode" / "agents"
+        if not local_dir.is_dir():
+            self.skipTest("local source directory is unavailable")
+        for filename in names:
+            with self.subTest(agent=filename):
+                local_source = local_dir / filename
+                self.assertTrue(local_source.is_file(), "本地缺少 agent: " + filename)
+                published = (self.package / "agents" / filename).read_bytes()
+                self.assertEqual(
+                    self.normalized_agent_body(published),
+                    self.normalized_agent_body(local_source.read_bytes()),
+                    filename,
+                )
+
+    def test_gonghao_ad_identification_and_review_markers(self):
+        text = (self.package / "agents" / "gonghao.md").read_text(encoding="utf-8")
+        for marker in (
+            "广告可识别性",
+            "广告审查批准文号",
+            "平台规则来源URL",
+            "适用法域与行业",
+            "资质/审查文号缺口",
+            "review_tier=STANDARD|HIGH_RISK",
+        ):
+            self.assertIn(marker, text, marker)
+
+    def test_shencha_content_accepts_gonghao_as_social_upstream(self):
+        text = (self.package / "agents" / "shencha-content.md").read_text(encoding="utf-8")
+        self.assertIn("`gonghao`（公众号长文）", text)
+        # upstream_agent 必须落在报告接口字段表，而不只是正文提一句
+        self.assertIn("deprecated_input / upstream_agent`", text)
+        self.assertIn("`upstream_agent` 必填", text)
+
+    def test_no_agent_forces_content_review_for_strategy_only_modes(self):
+        sheyun = (self.package / "agents" / "sheyun.md").read_text(encoding="utf-8")
+        gonghao = (self.package / "agents" / "gonghao.md").read_text(encoding="utf-8")
+        self.assertIn("S4 纯策略无成稿", sheyun)
+        self.assertIn("G4 纯策略无成稿", gonghao)
+        for text, label in ((sheyun, "sheyun"), (gonghao, "gonghao")):
+            idx = text.index("纯策略无成稿")
+            tail = text[idx:text.index("\n- 完成末行", idx)]
+            self.assertNotIn("必须明确写 `shencha-content", tail, label)
+
+    def test_content_producers_pass_review_tier_and_upstream_agent(self):
+        for name, upstream in (("sheyun", "sheyun"), ("gonghao", "gonghao")):
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            self.assertIn("review_tier=STANDARD|HIGH_RISK", text, name)
+            self.assertIn("upstream_agent=" + upstream, text, name)
+        frontend = (self.package / "agents" / "frontend.md").read_text(encoding="utf-8")
+        self.assertIn("review_profiles=[microcopy] review_tier=STANDARD", frontend)
+
+    def test_changelog_does_not_contradict_strategy_status_rule(self):
+        changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
+        current = changelog[changelog.index("## [4.2.0]"):]
+        current = current[:current.index("## [4.1.0]")] if "## [4.1.0]" in current else current
+        self.assertNotIn("G4 无成稿时用 `DRAFT_DO_NOT_PUBLISH`", current)
+        self.assertIn("G4 无成稿不输出", current)
+
+    def test_strategy_only_modes_do_not_emit_content_status(self):
+        sheyun = (self.package / "agents" / "sheyun.md").read_text(encoding="utf-8")
+        gonghao = (self.package / "agents" / "gonghao.md").read_text(encoding="utf-8")
+        self.assertIn("S4：策略目标", sheyun)
+        self.assertIn("不输出 `CONTENT_STATUS`", sheyun)
+        self.assertIn("不输出 `CONTENT_STATUS`", gonghao)
+        # S2/S3 必须锚定状态
+        self.assertIn("批次实验说明 → `CONTENT_STATUS` → 待确认", sheyun)
+        self.assertIn("选题雷达 → `CONTENT_STATUS` → 待确认", sheyun)
+
+    def test_gonghao_strategy_route_does_not_misreference_engineering_reviewer(self):
+        text = (self.package / "agents" / "gonghao.md").read_text(encoding="utf-8")
+        idx = text.index("- **G4 纯策略无成稿**")
+        tail = text[idx:text.index("\n- 完成末行", idx)]
+        self.assertIn("主智能体决策", tail)
+        self.assertNotIn("按需交 `shencha` 做策略审查", tail)
+
+    def test_writer_description_does_not_claim_interface_microcopy(self):
+        for name in ("writer", "writer-pro"):
+            text = (self.package / "agents" / (name + ".md")).read_text(encoding="utf-8")
+            description = manage.parse_frontmatter(text)["description"]
+            self.assertNotIn("产品微文案", description, name)
+            self.assertNotIn("界面文案", description, name)
+
+    def test_gonghao_g4_does_not_force_content_review(self):
+        text = (self.package / "agents" / "gonghao.md").read_text(encoding="utf-8")
+        idx = text.index("- **G4 纯策略无成稿**")
+        tail = text[idx:text.index("\n- 完成末行", idx)]
+        self.assertIn("不进入内容门禁", tail)
+        self.assertNotIn("必须明确写 `shencha-content", tail)
+
+    def test_frontend_routes_interface_copy_to_microcopy_profile(self):
+        text = (self.package / "agents" / "frontend.md").read_text(encoding="utf-8")
+        self.assertIn("review_profiles=[microcopy]", text)
+
+    def test_audit_exclusion_docs_match_gate_regex(self):
+        for filename in ("README.md", "release-audits/README.md", "agents/github.md"):
+            text = (self.package / filename).read_text(encoding="utf-8")
+            self.assertNotIn("release-audits/v*.md", text, filename)
+
+    def test_microcopy_ownership_is_exclusive_between_frontend_and_writer(self):
+        fe = (self.package / "agents" / "frontend.md").read_text(encoding="utf-8")
+        wr = (self.package / "agents" / "writer.md").read_text(encoding="utf-8")
+        self.assertIn("与 writer 的分工（排他）", fe)
+        self.assertIn("由你唯一负责", fe)
+        self.assertIn("界面内文案", wr)
+        self.assertIn("由 `frontend` 唯一负责", wr)
+
+    def test_sheyun_contract_declares_platform_scope(self):
+        text = (self.package / "agents" / "sheyun.md").read_text(encoding="utf-8")
+        self.assertIn("LinkedIn / Facebook / Instagram", text)
+        self.assertIn("`gonghao`", text)
+
+    def test_readme_badge_matches_agent_count(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        self.assertIn("badge/agents-22-", readme)
+        self.assertIn("(#22-个岗位)", readme)
+        self.assertNotIn("badge/agents-21-", readme)
+
+    def test_gonghao_published_contract_and_tool_boundary(self):
+        path = self.package / "agents" / "gonghao.md"
+        text = path.read_text(encoding="utf-8")
+        metadata = manage.parse_frontmatter(text)
+        self.assertEqual(manage.EXPECTED_AGENT_COUNT, 22)
+        for key in manage.FORBIDDEN_PUBLISHED_KEYS:
+            self.assertNotIn(key, metadata)
+        self.assertTrue({"Bash", "Edit"}.isdisjoint(metadata["tools"]))
+        self.assertIn("Write", metadata["tools"])
+        for marker in (
+            "G1 单篇", "G2 系列", "G3 周运营", "G4 纯策略",
+            "## 平台规则与合规（公众号特有）",
+            "诱导分享", "诱导关注", "绝对化用语",
+            "原创声明", "留言区",
+            "review_profiles=[editorial,social]",
+        ):
+            self.assertIn(marker, text, marker)
+
+    def test_validate_rejects_missing_gonghao_contract_markers(self):
+        path = self.package / "agents" / "gonghao.md"
+        original = path.read_text(encoding="utf-8")
+        for marker in (
+            "## 平台规则与合规（公众号特有）",
+            "诱导分享",
+            "诱导关注",
+            "绝对化用语",
+            "原创声明",
+            "review_profiles=[editorial,social]",
+            "G4 纯策略",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, original)
+                stripped = original.replace(marker, "")
+                self.assertNotEqual(stripped, original)
+                path.write_text(stripped, encoding="utf-8")
+                self.assert_validation_fails_with(
+                    "missing role contract marker: {}".format(marker)
+                )
+                path.write_text(original, encoding="utf-8")
+
+    def test_frontend_microcopy_contract_markers(self):
+        path = self.package / "agents" / "frontend.md"
+        original = path.read_text(encoding="utf-8")
+        for marker in ("## 界面文案（微文案）", "[文案待确认", "与真实状态同源"):
+            self.assertIn(marker, original, marker)
+        for marker in ("## 界面文案（微文案）", "[文案待确认"):
+            with self.subTest(marker=marker):
+                stripped = original.replace(marker, "")
+                self.assertNotEqual(stripped, original)
+                path.write_text(stripped, encoding="utf-8")
+                self.assert_validation_fails_with(
+                    "missing role contract marker: {}".format(marker)
+                )
+                path.write_text(original, encoding="utf-8")
+
+    def test_readme_and_changelog_declare_twenty_two_agents(self):
+        readme = (self.package / "README.md").read_text(encoding="utf-8")
+        changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
+        self.assertIn("## 22 个岗位", readme)
+        self.assertIn("`gonghao`", readme)
+        self.assertNotIn("21 个岗位", readme)
+        self.assertIn("## [4.2.0] — 2026-09-10", changelog)
+        self.assertIn("gonghao", changelog)
 
     def test_dongcha_published_contract_and_tool_boundary(self):
         text = (self.package / "agents" / "dongcha.md").read_text(encoding="utf-8")
         metadata = manage.parse_frontmatter(text)
-        self.assertEqual(manage.EXPECTED_AGENT_COUNT, 21)
+        self.assertEqual(manage.EXPECTED_AGENT_COUNT, 22)
         self.assertNotIn("model", metadata)
         self.assertNotIn("thoughtLevel", metadata)
         self.assertNotIn("skills", metadata)
@@ -890,10 +1064,9 @@ class ManageTests(unittest.TestCase):
                 self.assert_validation_fails_with("missing role contract marker: {}".format(implication))
                 path.write_text(original, encoding="utf-8")
 
-    def test_readme_marks_eight_existing_agents_and_three_tier_round_limits(self):
+    def test_readme_marks_updated_agents_and_three_tier_round_limits(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
-        self.assertNotIn("九个既有 agent", readme)
-        self.assertIn("八个既有 agent", readme)
+        self.assertIn("更新 `frontend` 正文", readme)
         self.assertIn("run 级重交 ≤3", readme)
         self.assertIn("单 claim 审查 ≤3", readme)
         self.assertIn("专项重验 ≤2", readme)
@@ -935,7 +1108,7 @@ class ManageTests(unittest.TestCase):
         path.write_text(original.replace(", Write", "", 1), encoding="utf-8")
         self.assert_validation_fails_with("dongcha tools must include Write")
 
-    def test_content_review_v4_docs_cover_examples_and_migration(self):
+    def test_content_review_docs_cover_examples_and_current_migration(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
         protocol = (self.package / "INSTALL-FOR-AI.md").read_text(encoding="utf-8")
         for marker in (
@@ -954,15 +1127,13 @@ class ManageTests(unittest.TestCase):
             "普通用户直接执行 update 即可",
             "普通安装 state schema 不变",
             "默认保留现有 agent 的本地 `model`/`thoughtLevel`",
-            "新增 `dongcha`",
-            "更新 `seoer`、`writer`、`writer-pro`、`huoke`、`sheyun`、`outreach`",
-            "`shencha-content` 的 claim 复核",
-            "`shencha-final` 的生产资格授予",
+            "新增 `gonghao`",
+            "更新 `frontend` 正文",
         ):
             self.assertIn(marker, protocol)
         for marker in (
-            "下游 `seoer`、`writer`、`writer-pro`、`huoke`、`sheyun`、`outreach`",
-            "最终由 `shencha-final` 授予 `PRODUCTION_ELIGIBLE`",
+            "新增 `gonghao`",
+            "`frontend` 正文",
         ):
             self.assertIn(marker, readme)
 
@@ -1129,9 +1300,9 @@ class ManageTests(unittest.TestCase):
             text = (self.package / filename).read_text(encoding="utf-8")
             self.assertIn("ZCode 专用", text, filename)
 
-    def test_release_version_is_v4_1_0(self):
+    def test_release_version_is_v4_2_0(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        self.assertEqual(plugin["version"], "4.1.0")
+        self.assertEqual(plugin["version"], "4.2.0")
 
     def test_release_version_matches_latest_changelog(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
@@ -1212,11 +1383,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v4.1.0",
+            "tag=v4.2.0",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 4.1.0",
+            "同为 4.2.0",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -1246,9 +1417,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v4.1.0 --single-branch --depth 1",
+            "--branch v4.2.0 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `4.1.0`",
+            "同为 `4.2.0`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",

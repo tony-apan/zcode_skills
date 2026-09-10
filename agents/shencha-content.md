@@ -28,7 +28,7 @@ disallowedTools: [Bash, Write, Edit]
 
 ## 上游状态适配
 
-- 不重新定义通用 `CONTENT_STATUS`。启用 `social` 时只接受 sheyun 的 `FINAL_CONTENT | DRAFT_DO_NOT_PUBLISH | DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED | BLOCKED`。
+- 不重新定义通用 `CONTENT_STATUS`。启用 `social` 时接受以下上游生产者，且只接受同一组状态值 `FINAL_CONTENT | DRAFT_DO_NOT_PUBLISH | DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED | BLOCKED`：`sheyun`（LinkedIn/Facebook/Instagram 社媒帖）与 `gonghao`（公众号长文）。两者是各自独立的授权生产者，不得互相冒充；报告须记录 `upstream_agent`。
 - 启用 `email` 时只接受 outreach 的 `CONTENT_STATUS=FINAL_DRAFT | DRAFT_NATIVE_REVIEW_REQUIRED | NEEDS_INPUT | BLOCKED`，以及 `SEND_STATUS=SEND_BLOCKED | READY_FOR_HUMAN_SEND_REVIEW`。
 - 合法终态固定映射：social 的 `FINAL_CONTENT`、email 的 `FINAL_DRAFT` 仅允许继续审查，不自行构成 PASS；`DRAFT_DO_NOT_PUBLISH`、`DRAFT_COMPLETE_NATIVE_REVIEW_REQUIRED`、`DRAFT_NATIVE_REVIEW_REQUIRED`、`NEEDS_INPUT` => 对应 CORE UNVERIFIED、INCONCLUSIVE、NO_GO；任一上游 `BLOCKED` => 对应 CORE FAIL、BLOCK、NO_GO。
 - 缺失或未知状态值使对应 CORE UNVERIFIED、`review_verdict=INCONCLUSIVE`、NO_GO。
@@ -104,7 +104,7 @@ disallowedTools: [Bash, Write, Edit]
 
 ## 报告与独立复测接口
 
-1. `public_fields`：`report-id / role / requirement-version / snapshot(commit|source|artifact SHA|build-id) / generated-at / review_profiles / review_tier / deprecated_input`。
+1. `public_fields`：`report-id / role / requirement-version / snapshot(commit|source|artifact SHA|build-id) / generated-at / review_profiles / review_tier / deprecated_input / upstream_agent`。启用 `social` 时 `upstream_agent` 必填，取值为 `sheyun` 或 `gonghao`，须与所审稿件实际生产者一致；缺失或不符即对应 CORE UNVERIFIED、`review_verdict=INCONCLUSIVE`、`publication_decision=NO_GO`。
 2. `scope`：in/out、各 profile REQUIRED/N/A、法域/市场/语言、输入缺口；附 evidence、完整 claim ledger、preflight、coverage 与分批状态。
 3. `findings`：`finding-id / severity(P0-P3) / CORE|NONCORE / status / exact_quote / location / impact / evidence-id / owner / due / dependency / retest-owner / closure`。
 4. 初审 finding 只能 OPEN；后续仅 `OPEN | READY_FOR_RETEST | VERIFIED | ACCEPTED_RISK`。每项给锚点、编辑指令或替换文本、可判定验收标准及证据；工单与 finding 一一关联。
