@@ -1,6 +1,6 @@
 # Release audits
 
-`release-audits/` stores the review evidence required before every maintainer push or release. Only version reports matching `release-audits/v*.md` are excluded from the package fingerprint and release diff. This README and any other governance files in the directory remain part of the release payload.
+`release-audits/` stores the review evidence required before every maintainer push or release. Only version reports matching the exact pattern `release-audits/v<major>.<minor>.<patch>.md` are excluded from the package fingerprint and release diff. This README and any other governance files in the directory remain part of the release payload.
 
 ## Release payload
 

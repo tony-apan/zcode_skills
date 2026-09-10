@@ -2,6 +2,32 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [4.2.0] — 2026-09-10
+
+### 新增
+- 新增 `gonghao` 公众号运营岗：按 G1 单篇、G2 系列、G3 周运营、G4 纯策略产出中文长文与配套运营物料（标题候选、摘要、封面配图说明与 alt、引导关注、单一 CTA），并维护控制卡与选题库。
+- 公众号平台特有合规写入契约：禁止诱导分享/关注/点赞（奖励、抽奖、集赞、强制转发）；广告法红线（绝对化用语与无法证实的承诺）；敏感行业资质要求；原创声明、转载授权、留言区互动与自动回复按平台现行规则并记录核验日期。
+- 中文原生表达要求：避免翻译腔、排比堆砌与四字词硬凑；标题承诺必须由正文兑现。
+- 广告可识别性：含购买方式、优惠、导流链接或软文时须显著标注"广告"，不得伪装成纯分享或以新闻报道形式发布广告。
+- 广告审查批准文号：医疗、药品、医疗器械、保健食品等依法需审查的广告须取得文号并规范标注，无文号不得发布。
+- 合规核验列为控制卡必填字段（`平台规则来源URL + 发布/访问日期`、`适用法域与行业`、`资质/审查文号缺口`、`是否需标"广告"`、`诱导互动风险自检结论`）；敏感行业缺资质或无法核验时固定降级 `DRAFT_DO_NOT_PUBLISH`。
+- `gonghao` G1–G4 每种模式末尾都锚定待确认；其中有成稿的 G1–G3 另输出 `CONTENT_STATUS`，G4 无成稿不输出。交审同时指定 `review_tier` 与 `upstream_agent`（仅 G1–G3）。
+- 纯策略模式（`gonghao` G4、`sheyun` S4）对称收口：无成稿故**不输出 `CONTENT_STATUS`**（该字段语义为"存在草稿"），`sheyun` S2/S3 补齐状态与待确认锚定；不进入内容门禁：`shencha-content` 只审成稿、`shencha` 只审代码与工程文档，策略稿统一交主智能体决策，两者完成末行分别给出成稿/未成稿两套措辞。
+- `frontend` 交付末行接通 `shencha-content review_profiles=[microcopy] review_tier=STANDARD`（敏感行业升 `HIGH_RISK`）。
+- 审计排除规则的文档表述统一为精确模式 `release-audits/v<major>.<minor>.<patch>.md`，与 `release_gate.py` 实际正则一致（原 `release-audits/v*.md` 为过宽表述）。
+
+### 变更
+- `frontend` 新增"界面文案（微文案）"职责：按钮、字段 label、错误、空状态、加载、权限不足、破坏性确认与 onboarding 引导由前端实现方撰写，要求与真实状态同源、用户语言、一个概念一个叫法、受限字符空间内不溢出、可见文案与可访问名称一致；营销与 SEO 长文案仍归 `writer`；真实状态无法确定时标 `[文案待确认：<缺什么>]`。
+- `frontend` 交付格式新增第 4 项"微文案"，其余项顺延。
+- 明确 `frontend` 与 `writer`/`writer-pro` 的**微文案所有权排他**：接入具体 UI、有真实状态与字符约束的界面文案由 `frontend` 唯一负责；`writer` 的 D 类收窄为"脱离具体界面实现"的产品短文案（产品名、slogan、独立通知邮件等），界面类需求转为对 frontend 的输入。
+- `shencha-content` 的 `social` 上游生产者由 `sheyun` 扩展为 `sheyun` 与 `gonghao`（公众号长文），两者独立授权、不得互相冒充，报告新增 `upstream_agent` 字段。
+- `sheyun` 契约内写明平台范围为 LinkedIn / Facebook / Instagram，并指明公众号归 `gonghao`。
+
+### 兼容性
+- 新增 agent 与职责补充均属向后兼容的 minor 更新；普通安装用户直接执行 update 即可，安装 state schema 不变。安装器会新增 `gonghao`、更新 `frontend` 正文，并通过三方合并保留本地 `model`/`thoughtLevel` 与其他本地修改。
+- `sheyun` 覆盖范围明确为 LinkedIn / Facebook / Instagram；公众号内容由 `gonghao` 承担。
+- 调用方如使用 `gonghao`，交审 profile 为 `review_profiles=[editorial,social]`（长文体裁承载在社媒平台，两类审查联合执行）。
+
 ## [4.1.0] — 2026-09-09
 
 ### 新增
