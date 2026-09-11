@@ -2,15 +2,23 @@ name: Validate release package
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
   pull_request:
+
+# Cancelling superseded runs only for pull requests keeps iteration cheap without
+# ever cancelling a release tag validation.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  # Pull requests run the full three-platform matrix; this is the only place the
+  # Windows/macOS wrappers and installers are exercised before merge.
   validate:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     strategy:
       fail-fast: false
       matrix:
@@ -44,14 +52,34 @@ jobs:
         run: |
           $Target = Join-Path $env:RUNNER_TEMP 'tony-agents-dry-run'
           ./scripts/install.ps1 --dry-run --target-dir $Target
+
+  # Release tags only need the Linux job: the tag points at a commit whose tree
+  # already passed the full matrix on its pull request.
+  validate-tag:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.9'
+      - name: Validate package
+        run: python scripts/manage.py validate
+      - name: Run tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Enforce GitHub agent release gate
+        run: python scripts/release_gate.py check --commit "${{ github.sha }}"
+      - name: Check shell wrappers
+        shell: sh
+        run: sh -n scripts/install.sh scripts/release.sh scripts/setup-hooks.sh .githooks/pre-push
       - name: Verify tag matches plugin version
-        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Linux'
         shell: bash
         run: |
           VERSION=$(python -c 'import json; print(json.load(open(".zcode-plugin/plugin.json", encoding="utf-8"))["version"])')
           test "${GITHUB_REF_NAME}" = "v${VERSION}"
       - name: Generate SHA256SUMS
-        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Linux'
         shell: bash
         run: |
           export LC_ALL=C
@@ -60,7 +88,6 @@ jobs:
             printf '%s\0' README.md MODEL_SETUP.md INSTALL-FOR-AI.md CHANGELOG.md LICENSE .zcode-plugin/plugin.json .github/workflows/validate.yml
           } | sort -z | xargs -0 sha256sum > SHA256SUMS
       - name: Upload checksums
-        if: startsWith(github.ref, 'refs/tags/v') && runner.os == 'Linux'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: SHA256SUMS-${{ github.ref_name }}

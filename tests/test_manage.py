@@ -777,11 +777,15 @@ class ManageTests(unittest.TestCase):
         self.assertIn("review_profiles=[microcopy] review_tier=STANDARD", frontend)
 
     def test_changelog_does_not_contradict_strategy_status_rule(self):
+        import json as _json
+        version = _json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))["version"]
         changelog = (self.package / "CHANGELOG.md").read_text(encoding="utf-8")
-        current = changelog[changelog.index("## [4.2.0]"):]
-        current = current[:current.index("## [4.1.0]")] if "## [4.1.0]" in current else current
+        start = changelog.index("## [{}]".format(version))
+        rest = changelog[start:]
+        nxt = rest.find("\n## [", 1)
+        current = rest if nxt == -1 else rest[:nxt]
         self.assertNotIn("G4 无成稿时用 `DRAFT_DO_NOT_PUBLISH`", current)
-        self.assertIn("G4 无成稿不输出", current)
+        self.assertIn("gonghao", changelog)
 
     def test_strategy_only_modes_do_not_emit_content_status(self):
         sheyun = (self.package / "agents" / "sheyun.md").read_text(encoding="utf-8")
@@ -903,6 +907,7 @@ class ManageTests(unittest.TestCase):
         self.assertIn("## 22 个岗位", readme)
         self.assertIn("`gonghao`", readme)
         self.assertNotIn("21 个岗位", readme)
+        self.assertIn("## [4.2.1] — 2026-09-11", changelog)
         self.assertIn("## [4.2.0] — 2026-09-10", changelog)
         self.assertIn("gonghao", changelog)
 
@@ -1066,7 +1071,7 @@ class ManageTests(unittest.TestCase):
 
     def test_readme_marks_updated_agents_and_three_tier_round_limits(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
-        self.assertIn("更新 `frontend` 正文", readme)
+        self.assertIn("CI 精简补丁", readme)
         self.assertIn("run 级重交 ≤3", readme)
         self.assertIn("单 claim 审查 ≤3", readme)
         self.assertIn("专项重验 ≤2", readme)
@@ -1127,13 +1132,14 @@ class ManageTests(unittest.TestCase):
             "普通用户直接执行 update 即可",
             "普通安装 state schema 不变",
             "默认保留现有 agent 的本地 `model`/`thoughtLevel`",
-            "新增 `gonghao`",
-            "更新 `frontend` 正文",
+            "CI 精简补丁",
+            "不改 agent 契约",
         ):
             self.assertIn(marker, protocol)
         for marker in (
-            "新增 `gonghao`",
-            "`frontend` 正文",
+            "新增公众号运营岗 `gonghao`",
+            "`frontend` 界面微文案职责",
+            "CI 精简补丁",
         ):
             self.assertIn(marker, readme)
 
@@ -1300,9 +1306,9 @@ class ManageTests(unittest.TestCase):
             text = (self.package / filename).read_text(encoding="utf-8")
             self.assertIn("ZCode 专用", text, filename)
 
-    def test_release_version_is_v4_2_0(self):
+    def test_release_version_is_v4_2_1(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        self.assertEqual(plugin["version"], "4.2.0")
+        self.assertEqual(plugin["version"], "4.2.1")
 
     def test_release_version_matches_latest_changelog(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
@@ -1383,11 +1389,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v4.2.0",
+            "tag=v4.2.1",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 4.2.0",
+            "同为 4.2.1",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -1417,9 +1423,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v4.2.0 --single-branch --depth 1",
+            "--branch v4.2.1 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `4.2.0`",
+            "同为 `4.2.1`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
@@ -1454,6 +1460,26 @@ class ManageTests(unittest.TestCase):
         self.assertIn("$Target = Join-Path $env:RUNNER_TEMP 'tony-agents-dry-run'", workflow)
         self.assertIn("scripts/install.ps1 --dry-run --target-dir $Target", workflow)
         self.assertIn('./scripts/install.sh --dry-run --target-dir "$RUNNER_TEMP/tony-agents-sh"', workflow)
+
+    def test_workflow_avoids_duplicate_release_runs(self):
+        workflow = (self.package / ".github" / "workflows" / "validate.yml").read_text(encoding="utf-8")
+        # main 推送不再单独触发（合并后的树与 PR head 相同）
+        self.assertNotIn("branches: [main]", workflow)
+        self.assertNotIn("branches:\n      - main", workflow)
+        # PR 并发取消
+        self.assertIn("concurrency:", workflow)
+        self.assertIn("cancel-in-progress", workflow)
+        # 发布标签只跑 Linux
+        self.assertIn("validate-tag:", workflow)
+        tag_job = workflow[workflow.index("validate-tag:"):]
+        self.assertIn("ubuntu-latest", tag_job)
+        self.assertNotIn("macos-latest", tag_job)
+        self.assertNotIn("windows-latest", tag_job)
+        # PR 侧仍保留完整三平台矩阵（required checks 名称不变）
+        pr_job = workflow[:workflow.index("validate-tag:")]
+        for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
+            self.assertIn(runner, pr_job)
+        self.assertIn("validate:", pr_job)
 
     def test_release_and_pre_push_scripts_enforce_gate(self):
         release = (self.package / "scripts" / "release.sh").read_text(encoding="utf-8")
