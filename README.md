@@ -13,6 +13,12 @@
 
 把仓库链接发给 ZCode 里的 AI，它会根据本地已配置的模型自动分配并安全安装整套智能体（岗位持续新增，当前 22 个）。
 
+> [!NOTE]
+> **费用与服务说明**
+> - **费用**：本包免费开源（MIT），不收授权费或服务费；可能产生的费用来自你使用的模型服务或套餐，具体以你实际使用的服务和额度为准。
+> - **服务**：只分享，不教学、不答疑——能上手到什么程度，取决于你的模型配置和上手实践。
+> - **遇到问题**：先看本 README 的[故障排查](#故障排查)、[MODEL_SETUP.md](MODEL_SETUP.md) 和 [laifa.xin 教程](https://www.laifa.xin/share/ai/zcode-multi-model-agents-guide)；也可以让 AI 读取仓库给出排查建议（自助路径，不保证解决所有问题）。
+
 > [!IMPORTANT]
 > **使用前提：必须先安装 ZCode。** 这不是独立软件，也不能直接在 ChatGPT 或 Claude 网页中使用。请从 ZCode 官方渠道安装，并完成首次启动；本文不提供未经可靠确认的官方 URL。
 
@@ -178,7 +184,7 @@ L2 一方数据验证痛点：
 
 ## 扫码入群
 
-使用中遇到问题、想交流模型配置或获取后续更新，可以扫码入群：
+想交流使用心得、获取版本更新动态，可以扫码入群：
 
 <div align="center">
   <a href="docs/images/wechat-group-qr.png"><img src="docs/images/wechat-group-qr.png" alt="扫码入群" width="25%" /></a>
@@ -188,6 +194,8 @@ L2 一方数据验证痛点：
 
 > [!NOTE]
 > 仓库内图片固定随版本审计；原始来源：<https://cos.files.maozhishi.com/data/web/web-files/wx/tony-apan.png>。若页面无法显示，可打开[仓库内二维码原图](docs/images/wechat-group-qr.png)。
+>
+> 💡 群里不提供答疑：具体问题请先按本 README 的「故障排查」和 [MODEL_SETUP.md](MODEL_SETUP.md) 自助排查，或让 AI 读取仓库给出排查建议。
 
 ## 更新
 
