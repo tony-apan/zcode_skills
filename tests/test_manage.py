@@ -907,7 +907,7 @@ class ManageTests(unittest.TestCase):
         self.assertIn("## 22 个岗位", readme)
         self.assertIn("`gonghao`", readme)
         self.assertNotIn("21 个岗位", readme)
-        self.assertIn("## [4.2.1] — 2026-09-11", changelog)
+        self.assertIn("## [4.2.2] — 2026-09-21", changelog)
         self.assertIn("## [4.2.0] — 2026-09-10", changelog)
         self.assertIn("gonghao", changelog)
 
@@ -1071,7 +1071,7 @@ class ManageTests(unittest.TestCase):
 
     def test_readme_marks_updated_agents_and_three_tier_round_limits(self):
         readme = (self.package / "README.md").read_text(encoding="utf-8")
-        self.assertIn("CI 精简补丁", readme)
+        self.assertIn("文档定位补丁", readme)
         self.assertIn("run 级重交 ≤3", readme)
         self.assertIn("单 claim 审查 ≤3", readme)
         self.assertIn("专项重验 ≤2", readme)
@@ -1132,14 +1132,14 @@ class ManageTests(unittest.TestCase):
             "普通用户直接执行 update 即可",
             "普通安装 state schema 不变",
             "默认保留现有 agent 的本地 `model`/`thoughtLevel`",
-            "CI 精简补丁",
+            "文档定位补丁",
             "不改 agent 契约",
         ):
             self.assertIn(marker, protocol)
         for marker in (
             "新增公众号运营岗 `gonghao`",
             "`frontend` 界面微文案职责",
-            "CI 精简补丁",
+            "文档定位补丁",
         ):
             self.assertIn(marker, readme)
 
@@ -1308,7 +1308,7 @@ class ManageTests(unittest.TestCase):
 
     def test_release_version_is_v4_2_1(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
-        self.assertEqual(plugin["version"], "4.2.1")
+        self.assertEqual(plugin["version"], "4.2.2")
 
     def test_release_version_matches_latest_changelog(self):
         plugin = json.loads((self.package / ".zcode-plugin" / "plugin.json").read_text(encoding="utf-8"))
@@ -1389,11 +1389,11 @@ class ManageTests(unittest.TestCase):
         prompt = readme[prompt_start:prompt_end]
         for marker in (
             "repo=https://github.com/tony-apan/zcode_skills",
-            "tag=v4.2.1",
+            "tag=v4.2.2",
             "INSTALL-FOR-AI.md",
             "scripts/model_inventory.py",
             "install --dry-run",
-            "同为 4.2.1",
+            "同为 4.2.2",
             "$env:TEMP",
             "mktemp",
             "以本提示词为准",
@@ -1423,9 +1423,9 @@ class ManageTests(unittest.TestCase):
             "## 阶段 2：生成脱敏模型映射",
             "## 阶段 3：执行 install、update 或强制重装",
             "## 阶段 4：完成报告与清理",
-            "--branch v4.2.1 --single-branch --depth 1",
+            "--branch v4.2.2 --single-branch --depth 1",
             "https://github.com/tony-apan/zcode_skills",
-            "同为 `4.2.1`",
+            "同为 `4.2.2`",
             "严禁直接 Read/cat ZCode config",
             "macOS / Linux",
             "Windows PowerShell 5.1+",
