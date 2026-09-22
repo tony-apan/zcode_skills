@@ -2,9 +2,31 @@
 
 本包遵循语义化版本：主版本（MAJOR）用于删除或改名 agent、改变必填输入/输出契约、扩大工具权限等破坏性变更；次版本（MINOR）用于向后兼容地新增 agent 或能力；修订号（PATCH）用于不改契约的措辞/事实修正和安装器 bug 修复。
 
+## [4.2.3] — 2026-09-22
+
+### 修复
+- 修复 Windows 与新版 ZCode 首次安装时 `scripts/model_inventory.py` 可能正常退出却返回空 `providers`，导致 AI 自适配流程在阶段 2 停止的问题。
+- 模型探测始终合并 `~/.zcode/v2/config.json` 与同目录 `provider_config.json` 的脱敏白名单数据；以后者的可用模型集合过滤旧配置残留，同时复用旧配置已声明的视觉/推理能力。
+- fallback 严格保持脱敏：不输出 provider 名称、API 格式、访问配置、API Key、token、baseURL 或未知字段；缺失的视觉/推理能力保持未知，不猜测。
+- 安装器新增只读 agent 盘点、岗位子集选择、未管理同名冲突决策、model-map/inventory 对账和 `PLAN_DIGEST` 确认；正式 install/update 只执行用户确认的同一计划，并通过 OS 排他锁串行化同目标目录操作。
+- rollback 同样改为 dry-run + `PLAN_DIGEST` 两阶段确认，计划绑定快照 manifest、快照内容、目标/state 前像与真实快照 ID；确认后发生漂移时保留用户修改并生成唯一恢复候选，不再无条件覆盖。
+- 正式写入/删除新增原子前像认领与不覆盖发布：最终窗口出现非协作保存时失败关闭，并保留原路径内容与必要的 `.tony-agents-pack.concurrent.*` 候选；冲突 incoming 与卸载 restore 候选也改为唯一时间戳文件，不覆盖旧候选；state 的 `installed_sha` 只绑定本次实际写入字节，不再把并发保存误记为 clean。
+- 自动失败回滚在释放同一把 OS 操作锁之前完成；Ctrl-C 同样触发回滚并以 130 干净退出。Unix 以 descriptor-relative no-follow 方式访问 `.tony-agents-pack`，Windows 逐级持有不共享删除权限的目录句柄并拒绝 reparse point/junction；锁、state/base/backup/snapshot 同样失败关闭。
+- snapshot 升级为 schema v2，manifest 记录并校验每个 agent 与 state SHA，拒绝 symlink/特殊文件和损坏内容；旧 schema v1 保持可读，其实际内容 SHA 由 rollback 计划绑定。
+- JSON 配置读取兼容 UTF-8 BOM、UTF-16LE/UTF-16BE（有无 BOM）；显式空岗位集合、空路径和布尔型 schema 不再静默降级。
+- update 默认只更新用户已选岗位，新版新增或此前未选岗位只报告为 `AVAILABLE NOT SELECTED`，用户显式 `--add` 后才安装，避免重复更新不断堆入新岗位。
+
+### 兼容性
+- 不改任何 agent 契约、岗位总数或默认目标目录；旧版 `config.json` 模型探测保持兼容。
+- state 向后兼容升级为 schema v2：新增 `selected_agents` 与 `base_sha`，旧 state 缺字段时按原 `files` 集合迁移并校验旧 base 可解析，首次成功 update 后写入；不会自动补齐未选岗位。
+- `provider_config.json` 缺失时保持旧 inventory；文件存在但 JSON/schema 损坏时失败关闭。inventory 固定标记 `DECLARED_UNVERIFIED`，真实模型 probe 默认关闭且必须由用户授权、通过 ZCode 运行时执行。
+
 ## [4.2.2] — 2026-09-21
 
-README 定位说明：顶部新增「费用与服务说明」（免费开源 MIT；费用来自用户自己的模型服务或套餐；只分享，不教学、不答疑，附自助排查路径）。扫码入群段改定位：保留群，导语改为交流心得与版本动态，并明示群里不提供答疑。不改任何 agent 契约、安装/更新/卸载流程与 state schema。
+### 文档定位
+- README 顶部新增「费用与服务说明」：本包免费开源（MIT），费用来自用户自己的模型服务或套餐；只分享，不教学、不答疑，并提供故障排查、模型配置指南与教程三条自助路径。
+- 扫码入群段保留交流群，导语改为交流心得与版本动态，并明示群内不提供答疑。
+- 不改任何 agent 契约、安装/更新/卸载流程与 state schema。
 
 ## [4.2.1] — 2026-09-11
 

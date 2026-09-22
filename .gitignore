@@ -9,5 +9,8 @@
 __pycache__/
 *.py[cod]
 .tony-agents-pack/
-*.tony-agents-pack.incoming
-*.tony-agents-pack.restore
+*.tony-agents-pack.incoming*
+*.tony-agents-pack.restore*
+*.tony-agents-pack.concurrent.*
+*.tony-agents-pack.rollback.*
+.*.tmp

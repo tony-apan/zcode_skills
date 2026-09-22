@@ -46,12 +46,18 @@ class ReleaseGateTests(unittest.TestCase):
         return path
 
     def git(self, *arguments):
+        # 净化 GIT_* 环境：在 pre-push hook 等泄漏 GIT_DIR/GIT_INDEX_FILE 的
+        # 环境里，子进程 git 会绕过 -C 指向真实仓库，污染维护者分支。
+        environment = {
+            key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        }
         result = subprocess.run(
             [shutil.which("git"), "-C", str(self.root)] + list(arguments),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             check=False,
+            env=environment,
         )
         if result.returncode != 0:
             self.fail("git {} failed: {}".format(" ".join(arguments), result.stderr))
@@ -99,6 +105,32 @@ class ReleaseGateTests(unittest.TestCase):
         body = "\n\n".join("## {}\n\n{}".format(name, sections[name]) for name in order)
         self.write("release-audits/v3.1.0.md", "---\n{}\n---\n\n# Release Gate v3.1.0\n\n{}\n".format(frontmatter, body))
         return fields["package_fingerprint"]
+
+    def test_runtime_recovery_candidates_are_excluded(self):
+        names = (
+            "coder.md.tony-agents-pack.incoming",
+            "coder.md.tony-agents-pack.incoming.20260922T000000.000001Z",
+            "coder.md.tony-agents-pack.restore",
+            "coder.md.tony-agents-pack.restore.20260922T000000.000001Z",
+            "coder.md.tony-agents-pack.rollback.20260921T000000.000001Z",
+            "coder.md.tony-agents-pack.concurrent.abc123",
+            ".coder.md.abcdef1234567890.tmp",
+        )
+        for name in names:
+            self.write(name, "runtime recovery candidate\n")
+            self.assertTrue(release_gate.excluded(Path(name)))
+            self.assertNotIn(name, [path.as_posix() for path in release_gate.payload_paths(self.root)])
+
+    def test_runtime_candidate_gitignore_matches_unique_names(self):
+        ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        for pattern in (
+            "*.tony-agents-pack.incoming*",
+            "*.tony-agents-pack.restore*",
+            "*.tony-agents-pack.concurrent.*",
+            "*.tony-agents-pack.rollback.*",
+            ".*.tmp",
+        ):
+            self.assertIn(pattern, ignore)
 
     def test_valid_worktree_report_passes_and_audit_report_is_excluded(self):
         fingerprint = self.write_audit()
