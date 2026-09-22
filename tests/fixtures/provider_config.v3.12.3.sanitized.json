@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "config": {
+    "providerConfigRules": {
+      "providerRules": [
+        {
+          "providerId": "provider-example",
+          "providerName": "<redacted>",
+          "config": {
+            "access": {
+              "type": "api-key",
+              "apiKey": "<redacted>"
+            },
+            "api": {
+              "baseURL": "<redacted>"
+            },
+            "group": "<redacted>",
+            "modelOrder": [
+              "model-example"
+            ],
+            "personalModelIds": [
+              "model-example"
+            ]
+          }
+        }
+      ]
+    },
+    "modelConfigRules": {
+      "providerModelRules": [
+        {
+          "providerId": "provider-example",
+          "modelId": "model-example",
+          "config": {
+            "properties": {
+              "contextWindow": 1000000
+            },
+            "optionSpecs": {
+              "reasoningLevel": {
+                "values": [
+                  "low",
+                  "high"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "manualProviderModelRules": []
+    }
+  },
+  "fixtureMetadata": {
+    "sourceSchema": "ZCode 3.12.3 provider_config.json",
+    "sanitized": true
+  }
+}

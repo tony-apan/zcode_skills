@@ -81,7 +81,12 @@ def excluded(relative: Path) -> bool:
         name.endswith(".pyc")
         or (len(parts) == 1 and name == "SHA256SUMS")
         or name.endswith(".tony-agents-pack.incoming")
+        or ".tony-agents-pack.incoming." in name
         or name.endswith(".tony-agents-pack.restore")
+        or ".tony-agents-pack.restore." in name
+        or ".tony-agents-pack.rollback." in name
+        or ".tony-agents-pack.concurrent." in name
+        or (name.startswith(".") and name.endswith(".tmp"))
     )
 
 
