@@ -370,11 +370,9 @@ class ManageTests(unittest.TestCase):
         injected = {"value": False}
 
         def side_effect(source, target, source_dir_fd=None, target_dir_fd=None):
-            # Windows runner 的 TEMP 可能是 8.3 短路径，resolve() 展开前后字符串
-            # 不同；注入匹配必须走 normcase+abspath 归一，保证跨平台命中。
-            injected_target = os.path.normcase(os.path.abspath(os.fspath(path)))
-            rename_target = os.path.normcase(os.path.abspath(os.fspath(target)))
-            if rename_target == injected_target and not injected["value"]:
+            # 该流程中 exclusive_rename 仅在最终发布时调用一次；与路径字符串无关的
+            # 首次调用注入可同时命中 macOS（/var→/private/var）与 Windows（8.3 短路径）。
+            if not injected["value"]:
                 injected["value"] = True
                 path.write_bytes(concurrent)
             return original_exclusive_rename(source, target, source_dir_fd, target_dir_fd)
