@@ -370,7 +370,11 @@ class ManageTests(unittest.TestCase):
         injected = {"value": False}
 
         def side_effect(source, target, source_dir_fd=None, target_dir_fd=None):
-            if Path(target) == path.resolve() and not injected["value"]:
+            # Windows runner 的 TEMP 可能是 8.3 短路径，resolve() 展开前后字符串
+            # 不同；注入匹配必须走 normcase+abspath 归一，保证跨平台命中。
+            injected_target = os.path.normcase(os.path.abspath(os.fspath(path)))
+            rename_target = os.path.normcase(os.path.abspath(os.fspath(target)))
+            if rename_target == injected_target and not injected["value"]:
                 injected["value"] = True
                 path.write_bytes(concurrent)
             return original_exclusive_rename(source, target, source_dir_fd, target_dir_fd)
@@ -392,7 +396,7 @@ class ManageTests(unittest.TestCase):
         (self.target / ".tony-agents-pack").symlink_to(outside, target_is_directory=True)
         manager = self.manager()
 
-        with self.assertRaisesRegex(manage.DecisionRequired, "metadata path contains a symlink"):
+        with self.assertRaisesRegex(manage.DecisionRequired, "metadata path contains a (symlink|reparse point)"):
             with manager.operation_lock():
                 self.fail("symlinked metadata directory unexpectedly locked")
 
@@ -685,7 +689,7 @@ class ManageTests(unittest.TestCase):
         shutil.rmtree(manager.snapshots_dir)
         manager.snapshots_dir.symlink_to(outside, target_is_directory=True)
 
-        with self.assertRaisesRegex(manage.DecisionRequired, "symlink|non-directory"):
+        with self.assertRaisesRegex(manage.DecisionRequired, "symlink|non-directory|reparse point"):
             manager.rollback("latest", True)
         self.assertEqual(list(outside.iterdir()), [])
 
@@ -818,6 +822,10 @@ class ManageTests(unittest.TestCase):
                 self.assertIn("must not be empty", result.stderr)
                 self.assertFalse((self.temp / ".tony-agents-pack").exists())
 
+    @unittest.skipIf(
+        os.name == "nt",
+        "ntpath expands unknown ~user to a local path without error; behavior is POSIX-specific",
+    )
     def test_unknown_user_path_fails_without_traceback(self):
         script = self.package / "scripts" / "manage.py"
         result = subprocess.run(
